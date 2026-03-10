@@ -1,21 +1,10 @@
-<p align="center">
-  <a href="https://github.com/US-Department-of-the-Treasury/ship">
-    <img src="web/public/icons/blue/android-chrome-512x512.png" alt="Ship logo" width="120">
-  </a>
-</p>
 
-<h1 align="center">Ship</h1>
 
-<p align="center">
-  <strong>Project management that helps teams learn and improve</strong>
-</p>
+# Ship
 
-<p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License"></a>
-  <a href="https://github.com/US-Department-of-the-Treasury/ship/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
-  <img src="https://img.shields.io/badge/Section_508-Compliant-blue.svg" alt="Section 508 Compliant">
-  <img src="https://img.shields.io/badge/WCAG_2.1-AA-blue.svg" alt="WCAG 2.1 AA">
-</p>
+**Project management that helps teams learn and improve**
+
+
 
 ---
 
@@ -31,12 +20,14 @@ Ship is a project management tool that combines documentation, issue tracking, a
 
 Ship has four main views, each designed for different questions:
 
-| View | What it answers |
-|------|-----------------|
-| **Docs** | "Where's that document?" — Wiki-style pages for team knowledge |
-| **Issues** | "What needs to be done?" — Track tasks, bugs, and features |
-| **Projects** | "What are we building?" — Group issues into deliverables |
-| **Teams** | "Who's doing what?" — See workload across people and weeks |
+
+| View         | What it answers                                                |
+| ------------ | -------------------------------------------------------------- |
+| **Docs**     | "Where's that document?" — Wiki-style pages for team knowledge |
+| **Issues**   | "What needs to be done?" — Track tasks, bugs, and features     |
+| **Projects** | "What are we building?" — Group issues into deliverables       |
+| **Teams**    | "Who's doing what?" — See workload across people and weeks     |
+
 
 ### The Basics
 
@@ -116,21 +107,24 @@ pnpm dev
 
 Once it's running, open your browser to:
 
-**http://localhost:5173**
+**[http://localhost:5173](http://localhost:5173)**
 
 Log in with the demo account:
+
 - **Email:** `dev@ship.local`
 - **Password:** `admin123`
 
 ### What's Running
 
-| Service | URL | Description |
-|---------|-----|-------------|
-| Web app | http://localhost:5173 | The Ship interface |
-| API server | http://localhost:3000 | Backend services |
-| Swagger UI | http://localhost:3000/api/docs | Interactive API documentation |
-| OpenAPI spec | http://localhost:3000/api/openapi.json | OpenAPI 3.0 specification |
-| PostgreSQL | localhost:5432 | Database (via Docker) |
+
+| Service      | URL                                                                              | Description                   |
+| ------------ | -------------------------------------------------------------------------------- | ----------------------------- |
+| Web app      | [http://localhost:5173](http://localhost:5173)                                   | The Ship interface            |
+| API server   | [http://localhost:3000](http://localhost:3000)                                   | Backend services              |
+| Swagger UI   | [http://localhost:3000/api/docs](http://localhost:3000/api/docs)                 | Interactive API documentation |
+| OpenAPI spec | [http://localhost:3000/api/openapi.json](http://localhost:3000/api/openapi.json) | OpenAPI 3.0 specification     |
+| PostgreSQL   | localhost:5432                                                                   | Database (via Docker)         |
+
 
 ### Common Commands
 
@@ -157,13 +151,15 @@ Ship is a monorepo with three packages:
 
 ### Tech Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React, Vite, TailwindCSS |
-| Editor | TipTap + Yjs (real-time collaboration) |
-| Backend | Express, Node.js |
-| Database | PostgreSQL |
-| Real-time | WebSocket |
+
+| Layer     | Technology                             |
+| --------- | -------------------------------------- |
+| Frontend  | React, Vite, TailwindCSS               |
+| Editor    | TipTap + Yjs (real-time collaboration) |
+| Backend   | Express, Node.js                       |
+| Database  | PostgreSQL                             |
+| Real-time | WebSocket                              |
+
 
 ### Design Decisions
 
@@ -220,30 +216,35 @@ Ship uses Playwright for end-to-end testing with 73+ tests covering all major fu
 
 Ship supports multiple deployment patterns:
 
-| Environment | Recommended Approach |
-|-------------|---------------------|
-| **Development** | Local with Docker Compose |
-| **Staging** | AWS Elastic Beanstalk |
-| **Production** | AWS GovCloud with Terraform |
+
+| Environment     | Recommended Approach        |
+| --------------- | --------------------------- |
+| **Development** | Local with Docker Compose   |
+| **Staging**     | AWS Elastic Beanstalk       |
+| **Production**  | AWS GovCloud with Terraform |
+
 
 ### Docker
 
 ```bash
-# Build production images
-docker build -t ship-api ./api
-docker build -t ship-web ./web
+# Build production images (context is repo root)
+docker build -t ship-api .
+docker build -t ship-web -f web/Dockerfile .
 
-# Run with Docker Compose
-docker-compose -f docker-compose.prod.yml up
+# Local development (full stack: Postgres + API + Web)
+pnpm docker:up
+# Or: docker compose -f docker-compose.local.yml up --build
 ```
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Required |
-| `SESSION_SECRET` | Cookie signing secret | Required |
-| `PORT` | API server port | `3000` |
+
+| Variable         | Description                  | Default  |
+| ---------------- | ---------------------------- | -------- |
+| `DATABASE_URL`   | PostgreSQL connection string | Required |
+| `SESSION_SECRET` | Cookie signing secret        | Required |
+| `PORT`           | API server port              | `3000`   |
+
 
 ---
 
