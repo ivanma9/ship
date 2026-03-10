@@ -1,0 +1,14 @@
+{
+  "docId": "7c31bcfa-40d4-4bab-817d-f43d9ff78312",
+  "fuzz": {
+    "hugeLength": 52000,
+    "xssRawScriptTagInEditor": false
+  },
+  "collision": {
+    "v1": "CollisionA-1773127644046",
+    "v2": "CollisionB-1773127644046",
+    "final1": "CollisionA-1773127644046",
+    "final2": "CollisionB-1773127644046",
+    "inference": "Divergence"
+  }
+}

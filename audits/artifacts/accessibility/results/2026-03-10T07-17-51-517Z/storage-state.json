@@ -1,0 +1,35 @@
+{
+  "cookies": [
+    {
+      "name": "connect.sid",
+      "value": "s%3AUyX4GfnEY9M4SSV0GpO1OJHYppbfKIAR.B27dDlnWEFxoGHkdQE2nfZ4V3WgWgHFxOtV2bDVNg%2Bc",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1773127975.11232,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "session_id",
+      "value": "699782fc27e0ca63e5d6599253394c2be45848dc92c69fffeb62d7cd93871298",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1773127975.498551,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Strict"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "http://localhost:5174",
+      "localStorage": [
+        {
+          "name": "ship:auth-cache",
+          "value": "{\"user\":{\"id\":\"9224261d-b700-49dd-8a11-020e7648a924\",\"email\":\"dev@ship.local\",\"name\":\"Dev User\",\"isSuperAdmin\":true},\"currentWorkspace\":{\"id\":\"d7d15cc0-058c-4a03-8279-b54a74bc6cfd\",\"name\":\"Dev User's Workspace\",\"role\":\"admin\"},\"workspaces\":[{\"id\":\"d7d15cc0-058c-4a03-8279-b54a74bc6cfd\",\"name\":\"Dev User's Workspace\",\"role\":\"admin\"}],\"timestamp\":1773127075499}"
+        }
+      ]
+    }
+  ]
+}
