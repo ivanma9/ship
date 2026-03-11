@@ -1,5 +1,34 @@
 import { test, expect } from './fixtures/isolated-env';
 
+async function login(page: import('@playwright/test').Page, email: string = 'dev@ship.local') {
+  await page.goto('/login');
+  await page.fill('input[name="email"]', email);
+  await page.fill('input[name="password"]', 'admin123');
+  await page.click('button[type="submit"]');
+  await page.waitForURL(/\/(issues|docs)/);
+}
+
+async function createNewDocument(page: import('@playwright/test').Page): Promise<string> {
+  await page.goto('/docs');
+  await page.waitForLoadState('networkidle');
+
+  const createButton = page.locator('aside').getByRole('button', { name: /new|create|\+/i }).first();
+  if (await createButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await createButton.click();
+  } else {
+    await page.getByRole('button', { name: /new document/i }).click();
+  }
+
+  await page.waitForURL(/\/documents\/[a-f0-9-]+/, { timeout: 10000 });
+  await page.waitForSelector('.ProseMirror', { timeout: 10000 });
+  await expect(page.getByTestId('sync-status')).toContainText(/Saved|Cached|Saving|Offline/, { timeout: 15000 });
+  return page.url();
+}
+
+async function getEditorText(page: import('@playwright/test').Page): Promise<string> {
+  return await page.locator('.ProseMirror').textContent() ?? '';
+}
+
 test.describe('Content Caching - High Performance Navigation', () => {
 
   test.beforeEach(async ({ page }) => {
@@ -53,6 +82,46 @@ test.describe('Content Caching - High Performance Navigation', () => {
     }
   });
 
+});
+
+test.describe('Content Caching - Slow Refresh Recovery', () => {
+  test('receiver refresh converges after delayed collaboration reconnect without re-opening the document', async ({ page, browser, baseURL }) => {
+    await login(page, 'dev@ship.local');
+    const documentUrl = await createNewDocument(page);
+
+    const editor = page.locator('.ProseMirror');
+    await editor.click();
+    const initialText = `Initial cached content ${Date.now()}`;
+    await page.keyboard.type(initialText, { delay: 15 });
+    await expect.poll(() => getEditorText(page)).toContain(initialText);
+
+    const receiverContext = await browser.newContext({ baseURL });
+    await receiverContext.addInitScript(() => {
+      localStorage.setItem('ship:disableActionItemsModal', 'true');
+    });
+    const receiverPage = await receiverContext.newPage();
+
+    try {
+      await login(receiverPage, 'alice.chen@ship.local');
+      await receiverPage.goto(documentUrl);
+      await receiverPage.waitForSelector('.ProseMirror', { timeout: 10000 });
+      await expect.poll(() => getEditorText(receiverPage)).toContain(initialText);
+
+      await receiverPage.reload();
+      await receiverPage.waitForSelector('.ProseMirror', { timeout: 10000 });
+      await expect(receiverPage.getByTestId('sync-status')).toContainText(/Saved|Cached|Saving|Offline/, { timeout: 15000 });
+      await expect.poll(() => getEditorText(receiverPage)).toContain(initialText);
+
+      const delayedText = `Recovered after delayed sync ${Date.now()}`;
+      await editor.click();
+      await page.keyboard.type(` ${delayedText}`, { delay: 15 });
+      await expect.poll(() => getEditorText(page)).toContain(delayedText);
+
+      await expect.poll(() => getEditorText(receiverPage), { timeout: 15000 }).toContain(delayedText);
+    } finally {
+      await receiverContext.close();
+    }
+  });
 });
 
 test.describe('WebSocket Connection Reliability', () => {

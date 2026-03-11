@@ -89,6 +89,7 @@ function recordMessage(ws: WebSocket): void {
 const docs = new Map<string, Y.Doc>();
 const awareness = new Map<string, awarenessProtocol.Awareness>();
 const conns = new Map<WebSocket, { docName: string; awarenessClientId: number; userId: string; workspaceId: string }>();
+const docLoadSources = new Map<string, 'yjs_state' | 'json_fallback' | 'empty'>();
 
 // Global events connections (separate from document collaboration)
 // These persist across navigation and are used for real-time notifications
@@ -211,6 +212,7 @@ async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
     if (result.rows[0]?.yjs_state) {
       // Load from binary Yjs state (preferred path - content was previously synced)
       console.log(`[Collaboration] Loading ${docName} from yjs_state`);
+      docLoadSources.set(docName, 'yjs_state');
       Y.applyUpdate(doc, result.rows[0].yjs_state);
     } else if (result.rows[0]?.content) {
       // Fallback: convert JSON content to Yjs (for API-created documents)
@@ -233,6 +235,7 @@ async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
         if (jsonContent && jsonContent.type === 'doc' && Array.isArray(jsonContent.content)) {
           const fragment = doc.getXmlFragment('default');
           jsonToYjs(doc, fragment, jsonContent);
+          docLoadSources.set(docName, 'json_fallback');
           console.log(`[Collaboration] Successfully converted content for ${docName}: ${jsonContent.content.length} top-level nodes`);
           // Mark this doc as freshly loaded from JSON - clients should clear their cache
           freshFromJsonDocs.add(docName);
@@ -252,6 +255,7 @@ async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
         // Start with empty document if content is corrupted
       }
     } else {
+      docLoadSources.set(docName, 'empty');
       console.log(`[Collaboration] No content found for ${docName}, starting with empty document`);
     }
   } catch (err) {
@@ -486,6 +490,7 @@ export function invalidateDocumentCache(docId: string): void {
     // Remove from cache - next connection will reload from database
     docs.delete(docName);
     awareness.delete(docName);
+    docLoadSources.delete(docName);
 
     console.log(`[Collaboration] Invalidated cache for ${docName}`);
   }
@@ -600,6 +605,22 @@ export function broadcastToUser(userId: string, eventType: string, data?: Record
   }
 }
 
+export function broadcastToWorkspace(workspaceId: string, eventType: string, data?: Record<string, unknown>): void {
+  const payload = JSON.stringify({ type: eventType, data: data || {} });
+  let sentCount = 0;
+
+  eventConns.forEach((conn, ws) => {
+    if (conn.workspaceId === workspaceId && ws.readyState === WebSocket.OPEN) {
+      ws.send(payload);
+      sentCount++;
+    }
+  });
+
+  if (sentCount > 0) {
+    console.log(`[Events] Broadcast '${eventType}' to workspace ${workspaceId} (${sentCount} connections)`);
+  }
+}
+
 // DDoS protection: Max WebSocket message size (10MB, matches REST API limit)
 const MAX_WS_MESSAGE_SIZE = 10 * 1024 * 1024;
 
@@ -690,7 +711,12 @@ export function setupCollaboration(server: Server) {
 
     // If this doc was loaded fresh from JSON (API-created or API-updated content),
     // tell the browser to clear its IndexedDB cache before sync to prevent stale content merge
-    if (freshFromJsonDocs.has(docName)) {
+    const requiresCacheClear = freshFromJsonDocs.has(docName);
+    const loadSource = docLoadSources.get(docName) ?? 'empty';
+    console.log(
+      `[Collaboration] Startup doc=${docName} source=${loadSource} requiresCacheClear=${requiresCacheClear}`,
+    );
+    if (requiresCacheClear) {
       console.log(`[Collaboration] Sending cache clear signal for ${docName} (loaded fresh from JSON)`);
       const clearCacheEncoder = encoding.createEncoder();
       encoding.writeVarUint(clearCacheEncoder, messageClearCache);
@@ -779,6 +805,7 @@ export function setupCollaboration(server: Server) {
           if (stillNoConnections) {
             docs.delete(docName);
             awareness.delete(docName);
+            docLoadSources.delete(docName);
           }
         }, 30000);
       }

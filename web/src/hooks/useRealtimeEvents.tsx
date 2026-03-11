@@ -10,7 +10,11 @@ import {
 import { useAuth } from './useAuth';
 
 // Event types that can be received from the server
-export type RealtimeEventType = 'accountability:updated' | 'connected' | 'pong';
+export type RealtimeEventType =
+  | 'accountability:updated'
+  | 'document:title-updated'
+  | 'connected'
+  | 'pong';
 
 export interface RealtimeEvent {
   type: RealtimeEventType;
@@ -36,9 +40,18 @@ function getEventsWsUrl(): string {
     return wsUrl.replace(/^http/, 'ws') + '/events';
   }
 
-  // Fall back to API URL or current host
-  const apiUrl = import.meta.env.VITE_API_URL ?? '';
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const isLocalHost =
+    window.location.hostname === 'localhost'
+    || window.location.hostname === '127.0.0.1';
+
+  // In local dev, prefer the current Vite host so websocket traffic follows the
+  // same proxy configuration as HTTP requests and stays aligned with dynamic ports.
+  if (isLocalHost) {
+    return `${wsProtocol}//${window.location.host}/events`;
+  }
+
+  const apiUrl = import.meta.env.VITE_API_URL ?? '';
   return apiUrl
     ? apiUrl.replace(/^http/, 'ws') + '/events'
     : `${wsProtocol}//${window.location.host}/events`;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Editor } from '@/components/Editor';
 import { PropertiesPanel } from '@/components/sidebars/PropertiesPanel';
@@ -17,6 +17,7 @@ import type { DocumentType as SelectableDocumentType } from '@/components/sideba
 import { useAuth } from '@/hooks/useAuth';
 import { PlanQualityBanner, RetroQualityBanner } from '@/components/PlanQualityBanner';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import type { RequestError } from '@/lib/http-error';
 import type { Person } from '@/components/PersonCombobox';
 import type { BelongsTo } from '@ship/shared';
 
@@ -166,6 +167,12 @@ interface UnifiedEditorProps {
   titleSuffix?: string;
 }
 
+interface TitleConflictState {
+  attemptedTitle: string;
+  currentTitle: string;
+  currentUpdatedAt: string;
+}
+
 /**
  * UnifiedEditor - Adaptive editor component that renders type-specific properties
  *
@@ -203,6 +210,20 @@ export function UnifiedEditor({
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isChangingType, setIsChangingType] = useState(false);
+  const [titleSaveError, setTitleSaveError] = useState<string | null>(null);
+  const [titleConflict, setTitleConflict] = useState<TitleConflictState | null>(null);
+  const expectedUpdatedAtRef = useRef(document.updated_at);
+  const latestLocalTitleRef = useRef(document.title);
+
+  useEffect(() => {
+    expectedUpdatedAtRef.current = document.updated_at;
+    latestLocalTitleRef.current = document.title;
+  }, [document.id, document.title, document.updated_at]);
+
+  useEffect(() => {
+    setTitleSaveError(null);
+    setTitleConflict(null);
+  }, [document.id]);
 
   // Track missing required fields after type changes
   const missingFields = useMemo(() => {
@@ -229,9 +250,65 @@ export function UnifiedEditor({
   // Auto-save title changes
   const throttledTitleSave = useAutoSave({
     onSave: async (title: string) => {
-      if (title) await onUpdate({ title });
+      if (!title) return;
+      latestLocalTitleRef.current = title;
+      const payload: Partial<UnifiedDocument> & { expected_updated_at?: string } = {
+        title,
+        expected_updated_at: expectedUpdatedAtRef.current,
+      };
+
+      const result = await (onUpdate(payload as Partial<UnifiedDocument>) as Promise<{ title?: string; updated_at?: string } | void>);
+      if (result && typeof result.title === 'string') {
+        latestLocalTitleRef.current = result.title;
+      }
+      if (result && typeof result.updated_at === 'string') {
+        expectedUpdatedAtRef.current = result.updated_at;
+      }
+    },
+    onSuccess: (savedTitle) => {
+      latestLocalTitleRef.current = savedTitle;
+      setTitleSaveError(null);
+      setTitleConflict(null);
+    },
+    onFailure: (error) => {
+      const requestError = error as RequestError | undefined;
+      if (requestError?.status === 409 && requestError.currentTitle && requestError.currentUpdatedAt) {
+        expectedUpdatedAtRef.current = requestError.currentUpdatedAt;
+        setTitleConflict({
+          attemptedTitle: requestError.attemptedTitle || latestLocalTitleRef.current || document.title,
+          currentTitle: requestError.currentTitle,
+          currentUpdatedAt: requestError.currentUpdatedAt,
+        });
+      }
+      setTitleSaveError(getTitleSaveErrorMessage(error));
     },
   });
+
+  const handleTitleChange = useCallback((title: string) => {
+    latestLocalTitleRef.current = title;
+    throttledTitleSave(title);
+  }, [throttledTitleSave]);
+
+  const handleRetryTitleSave = useCallback(async () => {
+    if (!titleConflict) return;
+
+    const retryTitle = latestLocalTitleRef.current || titleConflict.attemptedTitle;
+    try {
+      const result = await onUpdate({
+        title: retryTitle,
+        expected_updated_at: titleConflict.currentUpdatedAt,
+      } as Partial<UnifiedDocument>) as { updated_at?: string } | void;
+
+      latestLocalTitleRef.current = retryTitle;
+      if (result?.updated_at) {
+        expectedUpdatedAtRef.current = result.updated_at;
+      }
+      setTitleSaveError(null);
+      setTitleConflict(null);
+    } catch (error) {
+      setTitleSaveError(getTitleSaveErrorMessage(error));
+    }
+  }, [onUpdate, titleConflict]);
 
   // Handle document type change
   const handleTypeChange = useCallback(async (newType: SelectableDocumentType) => {
@@ -431,6 +508,44 @@ export function UnifiedEditor({
     return undefined;
   }, [document.id, document.document_type, editorContent, handlePlanAnalysisChange, handleRetroAnalysisChange]);
 
+  const combinedContentBanner = useMemo(() => {
+    const autoSaveBanner = titleSaveError ? (
+      <div
+        role="alert"
+        className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-300"
+      >
+        <div className="space-y-2">
+          <p>{titleSaveError}</p>
+          {titleConflict ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-amber-200/80">
+                Server title: "{titleConflict.currentTitle}"
+              </span>
+              <button
+                type="button"
+                onClick={() => { void handleRetryTitleSave(); }}
+                className="rounded border border-amber-300/40 px-2 py-1 text-xs font-medium text-amber-100 hover:bg-amber-500/10"
+              >
+                Retry my title
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    ) : null;
+
+    if (!autoSaveBanner && !qualityBanner) {
+      return undefined;
+    }
+
+    return (
+      <div className="mb-4 space-y-3">
+        {autoSaveBanner}
+        {qualityBanner}
+      </div>
+    );
+  }, [handleRetryTitleSave, qualityBanner, titleConflict, titleSaveError]);
+
   const secondaryHeader = useMemo(() => {
     if (!weeklyReviewState?.isReviewMode) return undefined;
     return <WeeklyReviewSubNav reviewState={weeklyReviewState} />;
@@ -441,7 +556,7 @@ export function UnifiedEditor({
       documentId={document.id}
       userName={user.name}
       initialTitle={document.title}
-      onTitleChange={isTitleReadOnly ? undefined : throttledTitleSave}
+      onTitleChange={isTitleReadOnly ? undefined : handleTitleChange}
       titleReadOnly={isTitleReadOnly}
       onBack={onBack}
       backLabel={backLabel}
@@ -456,7 +571,7 @@ export function UnifiedEditor({
       sidebar={sidebar}
       documentType={document.document_type}
       onPlanChange={document.document_type === 'sprint' || document.document_type === 'project' ? handlePlanChange : undefined}
-      contentBanner={qualityBanner}
+      contentBanner={combinedContentBanner}
       onContentChange={isWeeklyDoc ? setEditorContent : undefined}
       aiScoringAnalysis={isWeeklyDoc ? aiScoringAnalysis : undefined}
       titleSuffix={titleSuffix}
@@ -484,6 +599,17 @@ function getDefaultPlaceholder(documentType: DocumentType): string {
     default:
       return 'Start writing...';
   }
+}
+
+function getTitleSaveErrorMessage(error: unknown): string {
+  const requestError = error as RequestError | undefined;
+  if (requestError?.status === 409 || requestError?.code === 'WRITE_CONFLICT') {
+    if (requestError.currentTitle) {
+      return `Title changed elsewhere. Latest title: "${requestError.currentTitle}". Review and retry your title.`;
+    }
+    return 'Title changed elsewhere. Refresh to merge latest changes before editing again.';
+  }
+  return 'Title could not be saved. Changes are local only until save succeeds.';
 }
 
 // Re-export PropertiesPanel as the unified entry point for sidebars

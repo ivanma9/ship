@@ -90,9 +90,27 @@ export const UpdateDocumentSchema = z.object({
   properties: z.record(z.unknown()).optional(),
   parent_id: UuidSchema.nullable().optional(),
   visibility: z.enum(['private', 'workspace']).optional(),
+  expected_title: z.string().optional().openapi({
+    description: 'Legacy optimistic concurrency token for title-only updates.',
+  }),
+  expected_updated_at: DateTimeSchema.optional().openapi({
+    description: 'Optimistic concurrency token. If provided and stale, API returns 409 WRITE_CONFLICT.',
+  }),
 }).openapi('UpdateDocument');
 
 registry.register('UpdateDocument', UpdateDocumentSchema);
+
+const WriteConflictSchema = z.object({
+  error: z.object({
+    code: z.literal('WRITE_CONFLICT'),
+    message: z.string(),
+  }),
+  attempted_title: z.string().optional(),
+  current_title: z.string(),
+  current_updated_at: DateTimeSchema,
+}).openapi('DocumentWriteConflict');
+
+registry.register('DocumentWriteConflict', WriteConflictSchema);
 
 // ============== Register Document Endpoints ==============
 
@@ -233,6 +251,14 @@ registry.registerPath({
     },
     404: {
       description: 'Document not found',
+    },
+    409: {
+      description: 'Write conflict (stale expected_updated_at token)',
+      content: {
+        'application/json': {
+          schema: WriteConflictSchema,
+        },
+      },
     },
   },
 });

@@ -13,11 +13,157 @@ interface ApiResponse<T> {
 
 // CSRF token cache for state-changing requests
 let csrfToken: string | null = null;
+const SESSION_REDIRECT_GRACE_MS = 1500;
+const AUTH_RETRY_DELAY_MS = 300;
+const AUTH_TURBULENCE_LOOKBACK_MS = 30_000;
+const AUTH_TURBULENCE_WINDOW_MS = 4_000;
+const AUTH_TURBULENCE_MAX_RETRIES = 3;
+let pendingSessionRedirect: ReturnType<typeof setTimeout> | null = null;
+let pendingSessionRedirectTarget: string | null = null;
+let lastAuthenticatedSuccessAt = 0;
+let authTurbulenceStartedAt: number | null = null;
 
 // Helper: Check if response has JSON content type
 function isJsonResponse(response: Response): boolean {
   const contentType = response.headers.get('content-type');
   return contentType?.includes('application/json') ?? false;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function isPublicRoute(): boolean {
+  return window.location.pathname.startsWith('/invite');
+}
+
+function shouldUseAuthTurbulence(endpoint: string): boolean {
+  if (!navigator.onLine || isPublicRoute() || endpoint === '/api/auth/login') {
+    return false;
+  }
+
+  if (authTurbulenceStartedAt !== null) {
+    return true;
+  }
+
+  return Date.now() - lastAuthenticatedSuccessAt <= AUTH_TURBULENCE_LOOKBACK_MS;
+}
+
+function clearAuthTurbulence(): void {
+  authTurbulenceStartedAt = null;
+}
+
+function recordAuthenticatedSuccess(): void {
+  lastAuthenticatedSuccessAt = Date.now();
+  clearAuthTurbulence();
+  clearPendingSessionRedirect();
+}
+
+function isRecoverableAuthFailureResponse(response: Response): boolean {
+  return response.status === 401 || (response.status === 403 && !isJsonResponse(response));
+}
+
+async function recoverAuthFailureResponse(
+  endpoint: string,
+  executeRequest: () => Promise<Response>,
+  response: Response
+): Promise<Response> {
+  if (!isRecoverableAuthFailureResponse(response) || !shouldUseAuthTurbulence(endpoint)) {
+    return response;
+  }
+
+  if (authTurbulenceStartedAt === null) {
+    authTurbulenceStartedAt = Date.now();
+    console.warn(`[api] Deferring auth redirect during reconnect turbulence for ${endpoint}`);
+  }
+
+  let retryCount = 0;
+  let currentResponse = response;
+
+  while (
+    retryCount < AUTH_TURBULENCE_MAX_RETRIES &&
+    authTurbulenceStartedAt !== null &&
+    Date.now() - authTurbulenceStartedAt < AUTH_TURBULENCE_WINDOW_MS
+  ) {
+    await sleep(AUTH_RETRY_DELAY_MS * (retryCount + 1));
+    retryCount += 1;
+    currentResponse = await executeRequest();
+
+    if (!isRecoverableAuthFailureResponse(currentResponse)) {
+      return currentResponse;
+    }
+  }
+
+  return currentResponse;
+}
+
+function clearPendingSessionRedirect(): void {
+  if (pendingSessionRedirect) {
+    clearTimeout(pendingSessionRedirect);
+    pendingSessionRedirect = null;
+    pendingSessionRedirectTarget = null;
+  }
+}
+
+function normalizeApiResponse<T>(response: Response, payload: unknown): ApiResponse<T> {
+  const defaultCode = response.status === 429 ? 'RATE_LIMITED' : `HTTP_${response.status}`;
+
+  if (payload && typeof payload === 'object') {
+    const body = payload as Record<string, unknown>;
+
+    if (typeof body.success === 'boolean') {
+      return body as unknown as ApiResponse<T>;
+    }
+
+    if (!response.ok) {
+      if (typeof body.error === 'string') {
+        return {
+          success: false,
+          error: { code: defaultCode, message: body.error },
+        };
+      }
+
+      if (body.error && typeof body.error === 'object') {
+        const nestedError = body.error as { code?: unknown; message?: unknown };
+        return {
+          success: false,
+          error: {
+            code: typeof nestedError.code === 'string' ? nestedError.code : defaultCode,
+            message: typeof nestedError.message === 'string' ? nestedError.message : 'Request failed',
+          },
+        };
+      }
+
+      if (typeof body.message === 'string') {
+        return {
+          success: false,
+          error: { code: defaultCode, message: body.message },
+        };
+      }
+
+      return {
+        success: false,
+        error: { code: defaultCode, message: 'Request failed' },
+      };
+    }
+
+    return {
+      success: true,
+      data: payload as T,
+    };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      error: { code: defaultCode, message: 'Request failed' },
+    };
+  }
+
+  return {
+    success: true,
+    data: payload as T,
+  };
 }
 
 /**
@@ -38,24 +184,40 @@ function handleSessionExpired(): never {
     throw new Error('Network offline - request failed');
   }
   // Don't redirect on public routes like /invite - they work without authentication
-  if (window.location.pathname.startsWith('/invite')) {
+  if (isPublicRoute()) {
     throw new Error('Session check failed - continuing on public route');
   }
   if (window.location.pathname !== '/login') {
-    const returnTo = encodeURIComponent(
-      window.location.pathname + window.location.search + window.location.hash
-    );
-    window.location.href = `/login?expired=true&returnTo=${returnTo}`;
+    if (!pendingSessionRedirect) {
+      const returnTo = encodeURIComponent(
+        window.location.pathname + window.location.search + window.location.hash
+      );
+      pendingSessionRedirectTarget = `/login?expired=true&returnTo=${returnTo}`;
+      pendingSessionRedirect = setTimeout(() => {
+        const target = pendingSessionRedirectTarget;
+        pendingSessionRedirect = null;
+        pendingSessionRedirectTarget = null;
+        if (target && navigator.onLine && window.location.pathname !== '/login') {
+          window.location.href = target;
+        }
+      }, SESSION_REDIRECT_GRACE_MS);
+    }
   }
-  // Throw to satisfy TypeScript's `never` type (redirect is async)
-  throw new Error('Session expired - redirecting to login');
+  // Throw to satisfy TypeScript's `never` type (redirect is async and deferred).
+  throw new Error('Session expired - redirect pending');
 }
 
 async function ensureCsrfToken(): Promise<string> {
   if (!csrfToken) {
-    const response = await fetch(`${API_URL}/api/csrf-token`, {
+    const executeRequest = () => fetch(`${API_URL}/api/csrf-token`, {
       credentials: 'include',
     });
+    let response = await executeRequest();
+    if (response.status === 401 || response.status === 403) {
+      await sleep(AUTH_RETRY_DELAY_MS);
+      response = await executeRequest();
+    }
+    response = await recoverAuthFailureResponse('/api/csrf-token', executeRequest, response);
     if (!response.ok || !isJsonResponse(response)) {
       // Session likely expired - redirect to login
       if (response.status === 401 || response.status === 403) {
@@ -65,6 +227,7 @@ async function ensureCsrfToken(): Promise<string> {
     }
     const data = await response.json();
     csrfToken = data.token;
+    recordAuthenticatedSuccess();
   }
   return csrfToken!;
 }
@@ -81,15 +244,25 @@ async function fetchWithCsrf(
   body?: object
 ): Promise<Response> {
   const token = await ensureCsrfToken();
-  const res = await fetch(`${API_URL}${endpoint}`, {
+  const executeRequest = (csrf: string) => fetch(`${API_URL}${endpoint}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
-      'X-CSRF-Token': token,
+      'X-CSRF-Token': csrf,
     },
     credentials: 'include',
     body: body ? JSON.stringify(body) : undefined,
   });
+  let res = await executeRequest(token);
+  if (res.status === 401) {
+    await sleep(AUTH_RETRY_DELAY_MS);
+    res = await executeRequest(token);
+  }
+  res = await recoverAuthFailureResponse(endpoint, () => executeRequest(token), res);
+
+  if (res.status === 401) {
+    handleSessionExpired(); // never returns
+  }
 
   const isJson = isJsonResponse(res);
 
@@ -102,23 +275,32 @@ async function fetchWithCsrf(
   if (res.status === 403 && isJson) {
     clearCsrfToken();
     const newToken = await ensureCsrfToken();
-    return fetch(`${API_URL}${endpoint}`, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': newToken,
-      },
-      credentials: 'include',
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    const retryResponse = await executeRequest(newToken);
+    if (retryResponse.status === 401) {
+      handleSessionExpired(); // never returns
+    }
+    if (retryResponse.ok) {
+      recordAuthenticatedSuccess();
+    }
+    return retryResponse;
+  }
+
+  if (res.ok) {
+    recordAuthenticatedSuccess();
   }
   return res;
 }
 
 export async function apiGet(endpoint: string): Promise<Response> {
-  const res = await fetch(`${API_URL}${endpoint}`, {
+  const executeRequest = () => fetch(`${API_URL}${endpoint}`, {
     credentials: 'include',
   });
+  let res = await executeRequest();
+  if (res.status === 401) {
+    await sleep(AUTH_RETRY_DELAY_MS);
+    res = await executeRequest();
+  }
+  res = await recoverAuthFailureResponse(endpoint, executeRequest, res);
 
   // Handle session expiration - redirect to login
   if (res.status === 401) {
@@ -138,6 +320,10 @@ export async function apiGet(endpoint: string): Promise<Response> {
     // 200 + non-JSON = likely routing/CDN misconfiguration
     // Don't redirect to login (not a session issue), throw error for React Query to handle
     throw new Error(`API returned HTML instead of JSON for ${endpoint}. This may indicate a routing or CDN configuration issue.`);
+  }
+
+  if (res.ok) {
+    recordAuthenticatedSuccess();
   }
 
   return res;
@@ -171,11 +357,20 @@ async function request<T>(
     headers['X-CSRF-Token'] = token;
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const executeRequest = () => fetch(`${API_URL}${endpoint}`, {
     ...options,
     credentials: 'include',
     headers,
   });
+  let response = await executeRequest();
+
+  // Retry once on 401 for non-login endpoints to avoid reconnect redirect churn.
+  if (response.status === 401 && endpoint !== '/api/auth/login') {
+    await sleep(AUTH_RETRY_DELAY_MS);
+    response = await executeRequest();
+  }
+  const turbulenceEligible = shouldUseAuthTurbulence(endpoint);
+  response = await recoverAuthFailureResponse(endpoint, executeRequest, response);
 
   // CloudFront may intercept errors and return HTML - detect and redirect
   if (!isJsonResponse(response)) {
@@ -189,13 +384,14 @@ async function request<T>(
     handleSessionExpired(); // never returns
   }
 
-  const data: ApiResponse<T> = await response.json();
+  const payload = await response.json();
+  const data = normalizeApiResponse<T>(response, payload);
 
   // Handle session expiration - redirect to login with expired=true
   // Only for SESSION_EXPIRED (actual expiration), not UNAUTHORIZED (no session existed)
   // Skip for public routes like /invite where 401 is expected for unauthenticated users
   if (response.status === 401) {
-    if (data.error?.code === 'SESSION_EXPIRED') {
+    if (data.error?.code === 'SESSION_EXPIRED' || turbulenceEligible) {
       if (!window.location.pathname.startsWith('/invite')) {
         handleSessionExpired(); // never returns - shows "session expired" message
       }
@@ -217,11 +413,32 @@ async function request<T>(
     if (!isJsonResponse(retryResponse)) {
       handleSessionExpired(); // never returns
     }
-    return retryResponse.json();
+    const retryPayload = await retryResponse.json();
+    const retryData = normalizeApiResponse<T>(retryResponse, retryPayload);
+    if (retryResponse.ok) {
+      recordAuthenticatedSuccess();
+    }
+    return retryData;
+  }
+
+  if (response.ok) {
+    recordAuthenticatedSuccess();
   }
 
   return data;
 }
+
+export const __apiTestUtils = {
+  resetForTests(): void {
+    clearCsrfToken();
+    clearPendingSessionRedirect();
+    clearAuthTurbulence();
+    lastAuthenticatedSuccessAt = 0;
+  },
+  markAuthenticatedSuccessForTests(): void {
+    recordAuthenticatedSuccess();
+  },
+};
 
 // Types for workspace management
 export interface Workspace {
