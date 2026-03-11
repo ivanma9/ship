@@ -84,7 +84,7 @@
 - Root cause: title updates use async patch/autosave flow outside CRDT convergence guarantees.
 - Before: clients can display conflicting final titles.
 - After (target): stale writes return `409 WRITE_CONFLICT`, and client prompts refresh/merge.
-- Implementation sketch: add versioned compare-and-swap on title patch (`expectedUpdatedAt` guard in SQL `WHERE` clause).
+- Implementation sketch: add title-focused compare-and-swap on title patch (`expected_title` guard in SQL `WHERE` clause).
 - Screenshot evidence:
 ![Gap 1 evidence](/Users/ivanma/Desktop/gauntlet/ShipShape/ship/audits/assets/gap1.png)
 
@@ -132,10 +132,54 @@
 
 ## 8. Boundary and Coverage
 
-- This is a diagnosis-only audit; no production fixes were applied.
+- Original run was diagnosis-only; remediation updates are tracked in Section 9.
 - Artifacts are in `audits/artifacts/`; harness scripts are in `audits/`.
 - Requirement status:
   - Three critical gaps with repro/cause/before/after: addressed.
   - User-facing confusion/data-loss scenario: addressed.
   - Explicit measurement path: addressed.
   - Per-gap screenshot/recording evidence for top 3 gaps: complete
+
+## 9. Improvement Plan and Execution Update (2026-03-10)
+
+### 9.1 Priority Plan
+
+| Priority | Finding | Plan | Status |
+| --- | --- | --- | --- |
+| P0 | Concurrent title edits diverge across clients | Add title-focused optimistic concurrency token (`expected_title`) on document PATCH and return `409 WRITE_CONFLICT` on stale updates; wire title autosave to send token and prompt refresh on conflict. | **Implemented** |
+| P1 | Reconnect redirect/auth churn | Add retry-once gate for transient 401s and a short delayed redirect window so successful reconnect traffic can cancel session-expired redirect. | **Implemented** |
+| P1 | Autosave terminal failures are silent | Extend autosave hook with terminal success/failure callbacks and show persistent editor banner until successful save clears it. | **Implemented** |
+| P2 | Login rate-limit (`429`) not clear | Normalize rate-limit responses to structured error shape and surface explicit lockout messaging in login UI. | **Implemented** |
+| P2 | Reviews button leads to `403` confusion | Hide Reviews nav entry for non-admin users and show explicit admin-access message on direct URL access. | **Implemented** |
+| P1/P2 | 3G stale receiver + initial collaboration mismatch | Add targeted collaboration lifecycle instrumentation and reconnect-sync assertions; tighten cache/provider handoff for slow refresh paths. | **Planned (next)** |
+
+### 9.2 Code Changes Applied
+
+- `api/src/routes/documents.ts`
+  - Added optional `expected_title` on PATCH for title-specific optimistic locking (plus `expected_updated_at` fallback support).
+  - Added optimistic concurrency guard with idempotent repeat-save tolerance for title updates.
+  - Added `409 WRITE_CONFLICT` response with `current_updated_at`.
+- `api/src/routes/documents.test.ts`
+  - Added regression tests for stale `expected_updated_at` and stale `expected_title` conflict behavior.
+- `web/src/components/UnifiedEditor.tsx`
+  - Title autosave now sends `expected_title`.
+  - Added persistent banner for terminal title-save failure, cleared on success.
+- `web/src/hooks/useAutoSave.ts`
+  - Added `onSuccess` / `onFailure` callbacks for terminal autosave visibility.
+- `web/src/lib/api.ts`
+  - Added reconnect retry gate for transient auth failures.
+  - Added short delayed session-expired redirect and cancellation on successful requests.
+  - Added API response normalization for non-standard error payloads (including rate limit).
+- `api/src/app.ts`
+  - Login limiter now returns structured `{ success: false, error: { code, message } }` JSON.
+- `web/src/hooks/useAuth.tsx`, `web/src/pages/Login.tsx`
+  - Added error code propagation and explicit `RATE_LIMITED` UI handling.
+- `web/src/pages/App.tsx`, `web/src/pages/ReviewsPage.tsx`
+  - Hide Reviews nav for non-admin users; clearer admin-only message on fetch.
+
+### 9.3 Validation Run
+
+- `pnpm --filter @ship/api exec vitest run src/routes/documents.test.ts -t "WRITE_CONFLICT"`: **pass**
+- `pnpm --filter @ship/web type-check`: **pass**
+- `pnpm --filter @ship/api type-check`: **pass**
+- `pnpm --filter @ship/shared type-check`: **pass**

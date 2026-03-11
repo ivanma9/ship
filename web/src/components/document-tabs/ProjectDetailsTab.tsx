@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAssignableMembersQuery } from '@/hooks/useTeamMembersQuery';
 import { useProgramsQuery } from '@/hooks/useProgramsQuery';
 import { apiPatch, apiDelete, apiPost } from '@/lib/api';
+import { createRequestError } from '@/lib/http-error';
 import { useToast } from '@/components/ui/Toast';
 import { issueKeys } from '@/hooks/useIssuesQuery';
 import { projectKeys } from '@/hooks/useProjectsQuery';
@@ -51,7 +52,7 @@ export default function ProjectDetailsTab({ documentId, document }: DocumentTabP
     mutationFn: async (updates: Partial<UnifiedDocument>) => {
       const response = await apiPatch(`/api/documents/${documentId}`, updates);
       if (!response.ok) {
-        throw new Error('Failed to update document');
+        throw await createRequestError(response, 'Failed to update document');
       }
       return response.json();
     },
@@ -89,8 +90,8 @@ export default function ProjectDetailsTab({ documentId, document }: DocumentTabP
         queryClient.setQueryData(['document', documentId], context.previousDocument);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['document', documentId] });
+    onSuccess: (updatedDocument) => {
+      queryClient.setQueryData(['document', documentId], updatedDocument);
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
     },
   });
@@ -179,7 +180,7 @@ export default function ProjectDetailsTab({ documentId, document }: DocumentTabP
 
   // Handle update
   const handleUpdate = useCallback(async (updates: Partial<UnifiedDocument>) => {
-    await updateMutation.mutateAsync(updates);
+    return updateMutation.mutateAsync(updates);
   }, [updateMutation]);
 
   // Handle delete

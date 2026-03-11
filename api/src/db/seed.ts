@@ -125,12 +125,16 @@ async function seed() {
       console.log('ℹ️  All users already exist');
     }
 
-    // Set dev user as super-admin and set their last workspace
-    await pool.query(
-      `UPDATE users SET is_super_admin = true, last_workspace_id = $1 WHERE email = 'dev@ship.local'`,
-      [workspaceId]
+    // Always reset dev user password and role (idempotent for dev credentials)
+    const devReset = await pool.query(
+      `UPDATE users SET password_hash = $1, is_super_admin = true, last_workspace_id = $2
+       WHERE LOWER(email) = 'dev@ship.local'
+       RETURNING id`,
+      [passwordHash, workspaceId]
     );
-    console.log('✅ Set dev@ship.local as super-admin');
+    if (devReset.rowCount && devReset.rowCount > 0) {
+      console.log('✅ Reset dev@ship.local password and super-admin');
+    }
 
     // Create workspace memberships and Person documents for all users
     // Note: These are independent - no coupling via person_document_id

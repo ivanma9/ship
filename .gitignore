@@ -42,6 +42,9 @@ Thumbs.db
 # Claude agents
 .claude/agents/
 
+# Codex/agent skills
+.agents/
+
 # Playwright MCP screenshots
 .playwright-mcp/
 

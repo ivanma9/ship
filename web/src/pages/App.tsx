@@ -1593,6 +1593,7 @@ function TeamSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentDocumentType } = useCurrentDocument();
+  const { isWorkspaceAdmin } = useWorkspace();
   const { id: personIdFromUrl } = useParams<{ id: string }>();
 
   // Check if we're viewing a person profile (at /team/:personId)
@@ -1664,20 +1665,22 @@ function TeamSidebar() {
             <span>Status Overview</span>
           </button>
         </li>
-        <li>
-          <button
-            onClick={() => navigate('/team/reviews')}
-            className={cn(
-              'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors',
-              isReviews
-                ? 'bg-border/50 text-foreground'
-                : 'text-muted hover:bg-border/30 hover:text-foreground'
-            )}
-          >
-            <ReviewsIcon />
-            <span>Reviews</span>
-          </button>
-        </li>
+        {isWorkspaceAdmin && (
+          <li>
+            <button
+              onClick={() => navigate('/team/reviews')}
+              className={cn(
+                'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors',
+                isReviews
+                  ? 'bg-border/50 text-foreground'
+                  : 'text-muted hover:bg-border/30 hover:text-foreground'
+              )}
+            >
+              <ReviewsIcon />
+              <span>Reviews</span>
+            </button>
+          </li>
+        )}
         <li>
           <button
             onClick={() => navigate('/team/org-chart')}

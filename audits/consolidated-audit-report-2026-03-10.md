@@ -156,7 +156,7 @@ node .tmp_type_safety_audit.cjs > /tmp/type_safety_results.json
   - No production-vs-test filtering in baseline counts
   - No runtime trace validation
 
-### 7. Improvement Plan (25% Core Reduction)
+### 7. Improvement Plan
 
 - Goal: Reduce core type-safety violations by at least 25% without behavior changes
 - Core scope: `any` + `as` + `!` + `@ts-ignore/@ts-expect-error`
@@ -301,6 +301,15 @@ Unused dependency candidates from static scan:
 - This audit is diagnostic only.
 - No code or dependency fixes were applied in this pass.
 
+### 9. Improvement Plan
+
+- **Goal:** Reduce entry chunk size and improve first-load performance.
+- **Targets:**
+  1. Lazy-load `emoji-picker-react`, `highlight.js`, and `yjs` where feasible.
+  2. Resolve Vite static/dynamic import conflicts for `upload.ts` and `FileAttachment.tsx`.
+  3. Evaluate and remove `@tanstack/query-sync-storage-persister` if unused.
+  4. Re-run `pnpm --filter @ship/web run build:analyze` and record before/after payload deltas.
+
 ---
 
 ## 3. API Response Time
@@ -378,7 +387,7 @@ Metric format for this table: `(ab/k6)` in milliseconds.
 
 ### Improvement Plan
 
-- Goal: reduce P95 by 20% on at least two endpoints under identical benchmark conditions.
+- **Goal:** Reduce P95 by 20% on at least two endpoints under identical benchmark conditions.
 - Primary targets (AB c50 baseline):
   - `/api/documents?type=wiki`: `123ms` -> `<=98ms`
   - `/api/issues`: `105ms` -> `<=84ms`
@@ -424,14 +433,6 @@ Method: Instrumented `pool.query` at the API layer and replayed five authenticat
    - This adds one extra query to each search request.
 3. Search by title uses `%ILIKE%` on `documents.title`.
    - `EXPLAIN ANALYZE` shows a sequential scan on content documents for this dataset.
-
-### Proposed Improvements (Not Applied)
-
-- In `api/src/services/accountability.ts`:
-  - Batch per-sprint standup checks and last-standup lookups into set-based queries.
-  - Batch sprint issue counts instead of querying once per sprint.
-- In `api/src/routes/search.ts`:
-  - Merge people and document search into one SQL statement (CTEs + `UNION ALL`) while preserving per-source limits.
 
 ### Projected Metrics (If Applied)
 
@@ -486,6 +487,15 @@ Execution-time delta (query family):
 - `audits/artifacts/db-query-efficiency-after.json`
 - `audits/artifacts/db-query-efficiency-after2.json`
 - `audits/database-query-efficiency-audit-2026-03-10.md`
+
+### Improvement Plan
+
+- **Goal:** Reduce query count and execution time for audited flows.
+- **Proposed changes (not applied):**
+  - In `api/src/services/accountability.ts`: Batch per-sprint standup checks and last-standup lookups into set-based queries; batch sprint issue counts instead of querying once per sprint.
+  - In `api/src/routes/search.ts`: Merge people and document search into one SQL statement (CTEs + `UNION ALL`) while preserving per-source limits.
+- **Target:** 20% reduction in Search content flow (5 → 4 queries); ~63% faster execution for that query family.
+- **Exit criterion:** Re-run instrumented flows and confirm projected metrics.
 
 ---
 
@@ -594,23 +604,7 @@ Execution-time delta (query family):
 
 Flaky tests observed in this command path: **0**.
 
-### 8. Improvement Target and Plan
-
-- Coverage unlock goal:
-  - Keep runnable coverage active in `api` and `web` and improve both line/branch baselines over time.
-- Reliability goal:
-  - Resolve the current 13 deterministic Web unit test failures, then re-run Web coverage without `coverage.reportOnFailure=true`.
-  - Replace fixed-wait patterns (`waitForTimeout`) in high-risk E2E specs with event/assertion-based waits.
-  - Track flaky rate with repeated baseline runs and record trend in this report.
-- Flow goal:
-  - Add 3 E2E scenarios for current dark logic gaps:
-    - concurrent same-document overlap edit convergence,
-    - offline edit replay exactly-once,
-    - RBAC revocation during active collaboration.
-- Reporting goal:
-  - Re-run audit after coverage/runtime fixes and update Section 9 with numeric coverage percentages and refreshed Pass/Fail/Flaky/runtime baselines.
-
-### 9. Residual Risk Summary
+### 8. Residual Risk Summary
 
 - Highest risk: collaboration correctness during concurrent edits, reconnects, and permission transitions.
 - Confidence: medium-high for measured baselines; medium for dark-logic inference (mapping + config analysis).
@@ -618,10 +612,17 @@ Flaky tests observed in this command path: **0**.
   - No CI-history flake-rate sampling in this audit.
   - Web coverage percentages are currently sampled with failing tests present; treat as provisional until web suite is stabilized.
 
-### 10. Audit Boundary Reminder
+### 9. Audit Boundary Reminder
 
 - This report is diagnosis only.
 - No fixes were implemented during this audit.
+
+### 10. Improvement Plan
+
+- **Coverage unlock:** Keep runnable coverage active in `api` and `web`; improve line/branch baselines over time.
+- **Reliability:** Resolve 13 deterministic Web unit test failures; replace `waitForTimeout` in high-risk E2E specs with event/assertion-based waits; track flaky rate.
+- **Flow coverage:** Add 3 E2E scenarios—concurrent same-document overlap edit convergence, offline edit replay exactly-once, RBAC revocation during active collaboration.
+- **Reporting:** Re-run audit after fixes and update coverage percentages and Pass/Fail/Flaky baselines.
 
 ---
 
@@ -696,7 +697,7 @@ Flaky tests observed in this command path: **0**.
 | 6    | P2       | Initial collaboration version mismatch on open       | User-observed shared document versions differed on first open, then converged after navigating out of the doc and back in                   | Users can see stale/conflicting state at entry and may lose trust in real-time accuracy until manual re-entry                                 |
 | 7    | P2       | Reviews button fails with `403 Forbidden`            | User-observed click on Reviews leads to `403 Forbidden` response                                                                            | Users cannot access review flow and may interpret this as a broken feature rather than a permission/state issue                               |
 
-### 5. Top 3 Fixes
+### 5. Top 3 Fixes (Detailed)
 
 #### Gap 1: Concurrent title collision divergence
 
@@ -759,6 +760,12 @@ Flaky tests observed in this command path: **0**.
   - User-facing confusion/data-loss scenario: addressed.
   - Explicit measurement path: addressed.
   - Per-gap screenshot/recording evidence for top 3 gaps: complete
+
+### 9. Improvement Plan (Top 3 Fixes)
+
+1. **Gap 1 – Concurrent title collision divergence:** Add versioned compare-and-swap on title patch (`expectedUpdatedAt` guard in SQL `WHERE` clause); stale writes return `409 WRITE_CONFLICT`; client prompts refresh/merge.
+2. **Gap 2 – Reconnect redirect storm:** Add circuit-breaker style `401` deferral window in `web/src/lib/api.ts`; apply short reconnect grace window and retry gate before forced session-expired redirect.
+3. **Gap 3 – Autosave failure visibility:** Add `onFailure` callback and exponential backoff handling in `useAutoSave`; show sticky error banner/toast on terminal failure; clear only after successful save.
 
 ---
 
@@ -865,3 +872,12 @@ Flaky tests observed in this command path: **0**.
 - Baseline audit deliverable table: **Addressed** (`## 3`).
 - Improvement plan and target-achievement path: **Addressed** (`## 5`, `## 6`).
 - Before/after evidence for selected target: **Addressed** (`## 5` + evidence bundles).
+
+### 8. Improvement Plan
+
+- **Achieved:** Critical/Serious issues fixed on `/dashboard`, `/my-week`, `/issues` (Lighthouse 100, 0 violations).
+- **Remaining:**
+  1. Resolve 3 Serious contrast issues on `/projects`, `/programs`, `/team/allocation` (exit: app-wide Serious = 0).
+  2. Fix keyboard traversal for table content (exit: keyboard completeness = Full).
+  3. Complete manual screen-reader pass; fix `/issues` table row/cell announcement gap.
+  4. Add CI regression gates for Lighthouse + axe on core routes.

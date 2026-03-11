@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import svgr from 'vite-plugin-svgr';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { resolve } from 'path';
 import { readFileSync, existsSync } from 'fs';
 
@@ -24,6 +25,7 @@ function getApiPort(): number {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   const apiPort = getApiPort();
+  const analyzeBundle = process.env.BUNDLE_ANALYZE === 'true';
 
   // Proxy configuration shared between dev and preview servers
   const proxyConfig = {
@@ -73,6 +75,14 @@ export default defineConfig(({ mode }) => {
           },
         },
       }),
+      analyzeBundle &&
+        visualizer({
+          filename: 'dist/bundle-report.html',
+          template: 'sunburst',
+          gzipSize: true,
+          brotliSize: true,
+          open: false,
+        }),
     ],
     resolve: {
       alias: {

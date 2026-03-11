@@ -163,8 +163,9 @@ export function LoginPage() {
     if (result.success) {
       navigate(from, { replace: true });
     } else {
-      setError(result.error || 'Login failed');
-      setErrorField('email'); // Associate general login errors with email field
+      const isRateLimited = result.code === 'RATE_LIMITED';
+      setError(result.error || (isRateLimited ? 'Too many login attempts. Please wait and try again.' : 'Login failed'));
+      setErrorField(isRateLimited ? 'general' : 'email');
       setIsLoading(false);
     }
   }

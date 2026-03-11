@@ -52,7 +52,7 @@ export function DashboardVariantC() {
           {nextRitual && (
             <div className="flex justify-center mt-3">
               <span className="inline-flex items-center gap-1.5 text-xs text-muted bg-[#1a1a1a] px-3 py-1.5 rounded">
-                <span className="h-1.5 w-1.5 rounded-full bg-muted/50" />
+                <span className="h-1.5 w-1.5 rounded-full bg-muted" />
                 {nextRitual}
               </span>
             </div>
@@ -71,7 +71,7 @@ export function DashboardVariantC() {
 
       {/* Your Focus */}
       <div>
-        <h2 className="text-xs font-semibold text-muted/60 uppercase tracking-wider mb-3">
+        <h2 className="text-xs font-semibold text-muted uppercase tracking-wider mb-3">
           Your Focus{allComplete ? ' This Week' : ''}
         </h2>
 
@@ -190,7 +190,7 @@ function WeekTimeline({ items, allComplete }: { items: TimelineDay[]; allComplet
             )}
             <div className={cn(
               'text-[10px] font-semibold uppercase tracking-wider mb-1.5',
-              isToday ? 'text-accent' : 'text-muted/50'
+              isToday ? 'text-blue-300' : 'text-muted'
             )}>
               {day.label}
             </div>
@@ -205,7 +205,7 @@ function WeekTimeline({ items, allComplete }: { items: TimelineDay[]; allComplet
                 overdue: 'text-red-300',
                 due: 'text-amber-300',
                 done: 'text-green-300',
-                future: 'text-muted/50',
+                future: 'text-muted',
               };
 
               const content = (
@@ -256,7 +256,7 @@ function PromptCard({ item }: { item: ActionItem }) {
       <div className="text-sm text-muted leading-relaxed mb-4">
         {description}
       </div>
-      <div className="text-xs text-muted/60 mb-4">
+      <div className="text-xs text-muted mb-4">
         {item.program_name}
       </div>
       <div className="flex gap-2">
@@ -302,7 +302,7 @@ function FocusCard({
         <div className="space-y-0">
           {plan.items.map((item, i) => (
             <div key={i} className="flex items-start gap-2.5 py-1.5">
-              <span className="text-[11px] font-semibold text-muted/50 w-4 text-right shrink-0 mt-0.5">
+              <span className="text-[11px] font-semibold text-muted w-4 text-right shrink-0 mt-0.5">
                 {i + 1}.
               </span>
               <span className="text-sm text-foreground leading-relaxed">{item.text}</span>
@@ -312,7 +312,7 @@ function FocusCard({
       ) : (
         <div className="text-sm text-muted">
           No plan written yet &mdash;{' '}
-          <Link to={`/documents/${project.id}`} className="text-accent hover:underline">
+          <Link to={`/documents/${project.id}`} className="text-blue-300 hover:text-blue-200 hover:underline">
             Write your plan
           </Link>
         </div>

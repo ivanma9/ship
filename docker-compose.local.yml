@@ -51,7 +51,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: Dockerfile.web
+      dockerfile: web/Dockerfile.dev
     ports:
       - "5173:5173"
     environment:
