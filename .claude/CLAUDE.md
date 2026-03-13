@@ -142,6 +142,46 @@ Use `/ship-philosophy-reviewer` to audit changes against Ship's core philosophy.
 - "Untitled" for all new docs (not "Untitled Issue")
 - YAGNI, boring technology, 4-panel layout
 
+## Commit Message Convention
+
+**Every commit MUST include a `Why:` line.** Format:
+
+```
+type(scope): short imperative summary
+
+Why: One or two sentences explaining the motivation — what was broken,
+what risk was addressed, or what constraint forced this approach.
+```
+
+Examples:
+```
+fix(types): replace as-any casts in pg mock helpers
+
+Why: The as-any pattern was masking a real type mismatch between mockQueryResult
+and pg's QueryResult overloads, which would have silently broken on pg upgrades.
+```
+```
+feat(ci): add type violation ceiling script
+
+Why: Without a hard ceiling, type debt accumulated silently across PRs.
+The script enforces a ratchet — violations can only go down, never up.
+```
+
+**Architectural decisions require an ADR.** Any time you make a decision about schema design, a new pattern, a technology choice, or a tradeoff with meaningful consequences, create a file in `docs/decisions/NNN-title.md` using the template at `docs/decisions/000-adr-template.md`.
+
+**Migration files must include a `-- Why:` comment** at the top explaining the motivation for the schema change.
+
+## Autonomous Commit Checkpoints
+
+When implementing multi-step work autonomously, **commit at natural checkpoints** — don't batch everything into one commit at the end. Commit when:
+- A migration is written and passes
+- A new API endpoint is functional and tested
+- A component renders correctly
+- Tests go from failing to green
+- A logical unit of work is complete (even if the feature isn't done)
+
+Each checkpoint commit follows the `Why:` convention above.
+
 ## Security Compliance
 
 **NEVER use `git commit --no-verify`.** See `/ship-security-compliance` skill for pre-commit hooks (`comply opensource`), CI enforcement, and compliance check failure handling.
