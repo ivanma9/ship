@@ -1060,7 +1060,7 @@ export function IssuesList({
 
   // Default empty state
   const defaultEmptyState = useMemo(() => (
-    <div className="text-center">
+    <div role="status" aria-live="polite" className="text-center">
       <p className="text-muted">No issues found</p>
       {canCreateIssue && (
         <button
@@ -1368,15 +1368,28 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
     }
   }
 
+  // Map column keys to their human-readable labels for screen reader announcements
+  const COL_LABELS: Record<typeof COLUMN_ORDER[number], string> = {
+    id: 'ID',
+    title: 'Title',
+    status: 'Status',
+    source: 'Source',
+    program: 'Program',
+    sprint: 'Week',
+    priority: 'Priority',
+    assignee: 'Assignee',
+    updated: 'Updated',
+  };
+
   return (
     <>
       {visibleColumns.has('id') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['id']}>
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['id']} aria-label={`${COL_LABELS.id}: #${issue.ticket_number}`}>
           #{issue.ticket_number}
         </td>
       )}
       {visibleColumns.has('title') && (
-        <td className={cn("px-4 py-3 text-sm text-foreground", cellClass)} role="gridcell" aria-colindex={colIndexMap['title']}>
+        <td className={cn("px-4 py-3 text-sm text-foreground", cellClass)} role="gridcell" aria-colindex={colIndexMap['title']} aria-label={`${COL_LABELS.title}: ${issue.title}`}>
           <div className="flex items-center gap-2">
             <span className="truncate">{issue.title}</span>
             {isOutOfContext && onAddToContext && (
@@ -1398,22 +1411,22 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
         </td>
       )}
       {visibleColumns.has('status') && (
-        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['status']}>
+        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['status']} aria-label={`${COL_LABELS.status}: ${STATE_LABELS[issue.state] || issue.state}`}>
           <StatusBadge state={issue.state} />
         </td>
       )}
       {visibleColumns.has('source') && (
-        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['source']}>
+        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['source']} aria-label={`${COL_LABELS.source}: ${issue.source || '—'}`}>
           <SourceBadge source={issue.source} />
         </td>
       )}
       {visibleColumns.has('program') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['program']}>
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['program']} aria-label={`${COL_LABELS.program}: ${getProgramTitle(issue) || '—'}`}>
           {getProgramTitle(issue) || '—'}
         </td>
       )}
       {visibleColumns.has('sprint') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['sprint']}>
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['sprint']} aria-label={`${COL_LABELS.sprint}: ${getSprintTitle(issue) || '—'}`}>
           {sprints && onSprintChange ? (
             <InlineWeekSelector
               value={getSprintId(issue)}
@@ -1426,12 +1439,12 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
         </td>
       )}
       {visibleColumns.has('priority') && (
-        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['priority']}>
+        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['priority']} aria-label={`${COL_LABELS.priority}: ${PRIORITY_LABELS[issue.priority] || issue.priority || '—'}`}>
           <PriorityBadge priority={issue.priority} />
         </td>
       )}
       {visibleColumns.has('assignee') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass, issue.assignee_archived && "opacity-50")} role="gridcell" aria-colindex={colIndexMap['assignee']}>
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass, issue.assignee_archived && "opacity-50")} role="gridcell" aria-colindex={colIndexMap['assignee']} aria-label={`${COL_LABELS.assignee}: ${issue.assignee_name ? `${issue.assignee_name}${issue.assignee_archived ? ' (archived)' : ''}` : 'Unassigned'}`}>
           {issue.assignee_name ? (
             <>
               {issue.assignee_name}{issue.assignee_archived && ' (archived)'}
@@ -1440,7 +1453,7 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
         </td>
       )}
       {visibleColumns.has('updated') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['updated']}>
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['updated']} aria-label={`${COL_LABELS.updated}: ${issue.updated_at ? formatDate(issue.updated_at) : '—'}`}>
           {issue.updated_at ? formatDate(issue.updated_at) : '-'}
         </td>
       )}

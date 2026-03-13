@@ -10,9 +10,9 @@
 
 | Route | Criterion | Result | Tester | Date | SR Version | Notes |
 |-------|-----------|--------|--------|------|------------|-------|
-| /issues | All cells announced with column header | — | | | | |
-| /issues | Row actions have meaningful labels | — | | | | |
-| /issues | Empty state announced | — | | | | |
+| /issues | All cells announced with column header | Implementation complete — pending manual VoiceOver session before merge | | | | aria-label="${colHeader}: ${value}" added to every gridcell in IssueRowContent |
+| /issues | Row actions have meaningful labels | Implementation complete — pending manual VoiceOver session before merge | | | | "Add to context" button has aria-label; status badge has aria-label; row click navigates (no unlabelled button) |
+| /issues | Empty state announced | Implementation complete — pending manual VoiceOver session before merge | | | | defaultEmptyState wrapped with role="status" aria-live="polite" |
 | /issues | Keyboard traversal complete (all initially loaded rows) | Pending manual verification — to be filled by developer before merge | | | | ARIA grid attributes added (aria-rowcount, aria-colcount, aria-rowindex, aria-colindex); ArrowLeft/Right cell navigation added in SelectableList |
 | /projects | No serious contrast violations | — | | | | |
 | /projects | Keyboard traversal complete | — | | | | |
