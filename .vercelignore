@@ -1,0 +1,10 @@
+api/
+terraform/
+tests/
+e2e/
+scripts/
+docs/
+.github/
+.claude/
+specs/
+node_modules/
