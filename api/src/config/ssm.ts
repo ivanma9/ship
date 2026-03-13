@@ -40,6 +40,20 @@ export async function loadProductionSecrets(): Promise<void> {
     return; // Use .env files for local dev
   }
 
+  // When AWS_REGION is not set (e.g. Railway deployment), secrets are injected
+  // as plain environment variables by the platform — no SSM needed.
+  if (!process.env.AWS_REGION) {
+    console.log('AWS_REGION not set — using environment variables directly (non-AWS deployment)');
+    const required = ['DATABASE_URL', 'SESSION_SECRET', 'CORS_ORIGIN', 'APP_BASE_URL'];
+    const missing = required.filter((key) => !process.env[key]);
+    if (missing.length > 0) {
+      throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    }
+    console.log(`CORS_ORIGIN: ${process.env.CORS_ORIGIN}`);
+    console.log(`APP_BASE_URL: ${process.env.APP_BASE_URL}`);
+    return;
+  }
+
   const environment = process.env.ENVIRONMENT || 'prod';
   const basePath = `/ship/${environment}`;
 
