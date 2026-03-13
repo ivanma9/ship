@@ -28,6 +28,7 @@ EXPOSE 80
 # Set production environment
 ENV NODE_ENV=production
 ENV VITE_APP_ENV=production
+# Default to port 80 (AWS EB); Railway overrides $PORT at runtime
 ENV PORT=80
 
 # Start the application (run migrations first to ensure schema exists)
