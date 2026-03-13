@@ -4,6 +4,7 @@ import { pool } from '../db/client.js';
 import { authMiddleware, superAdminMiddleware } from '../middleware/auth.js';
 import { ERROR_CODES, HTTP_STATUS } from '@ship/shared';
 import { logAuditEvent } from '../services/audit.js';
+import { disconnectUserFromWorkspace } from '../collaboration/index.js';
 
 const router: RouterType = Router();
 
@@ -1426,6 +1427,8 @@ router.delete('/workspaces/:workspaceId/members/:userId', async (req: Request, r
       `DELETE FROM sessions WHERE workspace_id = $1 AND user_id = $2`,
       [workspaceId, userId]
     );
+
+    disconnectUserFromWorkspace(workspaceId, userId);
 
     await logAuditEvent({
       workspaceId,

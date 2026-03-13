@@ -1059,7 +1059,7 @@ export function IssuesList({
       {canCreateIssue && (
         <button
           onClick={handleCreateIssue}
-          className="mt-2 text-sm text-accent hover:underline"
+          className="mt-2 text-sm text-blue-300 hover:text-blue-200 hover:underline"
         >
           Create an issue
         </button>

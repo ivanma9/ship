@@ -50,6 +50,7 @@ interface EditorProps {
   userName: string;
   userColor?: string;
   onTitleChange?: (title: string) => void;
+  onTitleBlur?: (title: string) => void;
   initialTitle?: string;
   /** Whether the title is read-only (e.g., for weekly plans/retros with computed titles) */
   titleReadOnly?: boolean;
@@ -100,6 +101,27 @@ function stringToColor(str: string): string {
   }
   const hue = hash % 360;
   return `hsl(${hue}, 70%, 60%)`;
+}
+
+function getCollaborationWsUrl(): string {
+  const explicitWsUrl = import.meta.env.VITE_WS_URL;
+  if (explicitWsUrl) {
+    return `${explicitWsUrl.replace(/^http/, 'ws')}/collaboration`;
+  }
+
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const isLocalHost =
+    window.location.hostname === 'localhost'
+    || window.location.hostname === '127.0.0.1';
+
+  if (isLocalHost) {
+    return `${wsProtocol}//${window.location.host}/collaboration`;
+  }
+
+  const apiUrl = import.meta.env.VITE_API_URL ?? '';
+  return apiUrl
+    ? `${apiUrl.replace(/^http/, 'ws')}/collaboration`
+    : `${wsProtocol}//${window.location.host}/collaboration`;
 }
 
 // Extract document mention IDs from TipTap JSON content
@@ -163,6 +185,7 @@ export function Editor({
   userName,
   userColor,
   onTitleChange,
+  onTitleBlur,
   initialTitle = 'Untitled',
   titleReadOnly = false,
   onBack,
@@ -237,6 +260,9 @@ export function Editor({
   // AbortController for cancelling async uploads (images, files) when navigating away
   // This prevents uploads from completing into a different document after navigation
   const imageUploadAbortRef = useRef<AbortController>(new AbortController());
+  const hasAuthoritativeSyncRef = useRef(false);
+  const startupReconnectAttemptsRef = useRef(0);
+  const startupWatchdogTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Find portal target for properties sidebar (for proper landmark order)
   useLayoutEffect(() => {
@@ -262,6 +288,13 @@ export function Editor({
   }, []);
 
   const color = userColor || stringToColor(userName);
+
+  const clearStartupWatchdog = useCallback(() => {
+    if (startupWatchdogTimerRef.current) {
+      clearTimeout(startupWatchdogTimerRef.current);
+      startupWatchdogTimerRef.current = null;
+    }
+  }, []);
 
   // Auto-focus and select title if "Untitled" (new document)
   // Uses double requestAnimationFrame to run AFTER useFocusOnNavigate's
@@ -289,6 +322,49 @@ export function Editor({
     let cancelled = false;
     // Store the updateUsers callback so we can properly remove it on cleanup
     let updateUsersCallback: (() => void) | null = null;
+    hasAuthoritativeSyncRef.current = false;
+    startupReconnectAttemptsRef.current = 0;
+    clearStartupWatchdog();
+
+    const reconnectForAuthoritativeSync = (reason: string) => {
+      if (cancelled || !wsProvider || !navigator.onLine || hasAuthoritativeSyncRef.current) {
+        return;
+      }
+      if (startupReconnectAttemptsRef.current >= 1) {
+        console.warn(`[Editor] Authoritative sync still pending for ${roomPrefix}:${documentId} after ${reason}`);
+        return;
+      }
+
+      startupReconnectAttemptsRef.current += 1;
+      console.warn(
+        `[Editor] Reconnecting collaboration for ${roomPrefix}:${documentId} to recover authoritative sync (${reason})`,
+      );
+      setSyncStatus(hasCachedContent ? 'connecting' : 'disconnected');
+
+      try {
+        wsProvider.disconnect();
+      } catch (err) {
+        console.error(`[Editor] Failed to disconnect collaboration provider for ${documentId}:`, err);
+      }
+
+      setTimeout(() => {
+        if (cancelled || !wsProvider || !navigator.onLine || hasAuthoritativeSyncRef.current) {
+          return;
+        }
+        wsProvider.connect();
+      }, 250);
+    };
+
+    const scheduleStartupWatchdog = () => {
+      clearStartupWatchdog();
+      if (!hasCachedContent || hasAuthoritativeSyncRef.current) {
+        return;
+      }
+
+      startupWatchdogTimerRef.current = setTimeout(() => {
+        reconnectForAuthoritativeSync('startup watchdog timeout');
+      }, 8000);
+    };
 
     // Create IndexedDB persistence for content caching
     // This loads cached content BEFORE WebSocket connects for instant navigation
@@ -301,6 +377,7 @@ export function Editor({
       if (indexeddbProvider.synced) {
         hasCachedContent = true;
         setSyncStatus('cached');
+        scheduleStartupWatchdog();
         resolve();
         return;
       }
@@ -310,6 +387,7 @@ export function Editor({
         hasCachedContent = true;
         setSyncStatus((prev) => prev === 'connecting' ? 'cached' : prev);
         console.log(`[Editor] IndexedDB synced for ${roomPrefix}:${documentId}`);
+        scheduleStartupWatchdog();
         resolve();
       };
       indexeddbProvider.on('synced', onSynced);
@@ -325,13 +403,7 @@ export function Editor({
     waitForCache.then(() => {
       if (cancelled) return;
 
-      // In production, use current host with wss:// (through CloudFront)
-      // In development, Vite proxy handles /collaboration WebSocket (see vite.config.ts)
-      const apiUrl = import.meta.env.VITE_API_URL ?? '';
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = apiUrl
-        ? apiUrl.replace(/^http/, 'ws') + '/collaboration'
-        : `${wsProtocol}//${window.location.host}/collaboration`;
+      const wsUrl = getCollaborationWsUrl();
       // Listen for custom "clear cache" message (type 3) from server
       // This is sent when the server loaded content fresh from JSON (API update/create)
       // We need to clear IndexedDB to prevent stale cached content from merging
@@ -342,6 +414,8 @@ export function Editor({
           const data = new Uint8Array(event.data);
           if (data.length > 0 && data[0] === MESSAGE_TYPE_CLEAR_CACHE) {
             console.log(`[Editor] Received cache clear signal for ${documentId}, clearing IndexedDB`);
+            hasAuthoritativeSyncRef.current = false;
+            setSyncStatus('connecting');
             // Clear the Y.Doc to remove any cached content before server sync
             ydoc.transact(() => {
               const fragment = ydoc.getXmlFragment('default');
@@ -357,6 +431,7 @@ export function Editor({
             }).catch((err) => {
               console.error(`[Editor] Failed to clear IndexedDB cache for ${documentId}:`, err);
             });
+            scheduleStartupWatchdog();
           }
         } catch {
           // Ignore errors from processing non-binary messages
@@ -386,10 +461,16 @@ export function Editor({
         if (cancelled) return; // Don't update state if effect was cleaned up
         console.log(`[Editor] WebSocket status: ${event.status} for ${roomPrefix}:${documentId}`);
         if (event.status === 'connected') {
-          setSyncStatus('synced');
+          setSyncStatus(hasAuthoritativeSyncRef.current ? 'synced' : hasCachedContent ? 'cached' : 'connecting');
+          scheduleStartupWatchdog();
         } else if (event.status === 'disconnected') {
           // If we have cached content, show 'cached' instead of 'disconnected'
-          setSyncStatus(hasCachedContent ? 'cached' : 'disconnected');
+          if (hasCachedContent && !hasAuthoritativeSyncRef.current && navigator.onLine) {
+            setSyncStatus('connecting');
+            scheduleStartupWatchdog();
+          } else {
+            setSyncStatus(hasCachedContent ? 'cached' : 'disconnected');
+          }
         }
       });
 
@@ -426,6 +507,14 @@ export function Editor({
         } else if (event?.code === 4101) {
           // Content updated via API - clear IndexedDB cache to prevent stale content merge
           console.log(`[Editor] Content updated via API for ${documentId}, clearing IndexedDB cache`);
+          hasAuthoritativeSyncRef.current = false;
+          setSyncStatus('connecting');
+          ydoc.transact(() => {
+            const fragment = ydoc.getXmlFragment('default');
+            while (fragment.length > 0) {
+              fragment.delete(0, 1);
+            }
+          });
           // Clear the IndexedDB cache so stale content doesn't merge with new content
           indexeddbProvider.clearData().then(() => {
             console.log(`[Editor] IndexedDB cache cleared for ${documentId}`);
@@ -433,6 +522,7 @@ export function Editor({
           }).catch((err) => {
             console.error(`[Editor] Failed to clear IndexedDB cache for ${documentId}:`, err);
           });
+          scheduleStartupWatchdog();
           // y-websocket will auto-reconnect, now with fresh state from server
         }
       });
@@ -441,6 +531,9 @@ export function Editor({
         if (cancelled) return; // Don't update state if effect was cleaned up
         console.log(`[Editor] WebSocket sync: ${isSynced} for ${roomPrefix}:${documentId}`);
         if (isSynced) {
+          hasAuthoritativeSyncRef.current = true;
+          startupReconnectAttemptsRef.current = 0;
+          clearStartupWatchdog();
           setSyncStatus('synced');
         }
       });
@@ -477,6 +570,7 @@ export function Editor({
 
     return () => {
       cancelled = true;
+      clearStartupWatchdog();
 
       // Abort any pending image uploads to prevent them from completing into wrong document
       imageUploadAbortRef.current.abort();
@@ -500,7 +594,28 @@ export function Editor({
       setProvider(null);
       setConnectedUsers([]);
     };
-  }, [documentId, userName, color, ydoc, roomPrefix, onBack, onDocumentConverted]);
+  }, [clearStartupWatchdog, documentId, userName, color, ydoc, roomPrefix, onBack, onDocumentConverted]);
+
+  useEffect(() => {
+    if (!provider) return;
+
+    const handleOnline = () => {
+      if (hasAuthoritativeSyncRef.current) return;
+      console.log(`[Editor] Browser returned online before authoritative sync for ${roomPrefix}:${documentId}, reconnecting collaboration`);
+      setSyncStatus('connecting');
+      try {
+        provider.disconnect();
+      } catch (err) {
+        console.error(`[Editor] Failed to disconnect provider during online recovery for ${documentId}:`, err);
+      }
+      provider.connect();
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [documentId, provider, roomPrefix]);
 
   // Create slash commands extension (memoized to avoid recreation)
   // documentId is in deps to ensure fresh AbortSignal when switching documents
@@ -813,6 +928,10 @@ export function Editor({
     onTitleChange?.(newTitle);
   }, [onTitleChange]);
 
+  const handleTitleBlur = useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
+    onTitleBlur?.(e.target.value);
+  }, [onTitleBlur]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Compact header - breadcrumb, title, status, presence all in one row */}
@@ -928,6 +1047,7 @@ export function Editor({
               ref={titleInputRef}
               value={title}
               onChange={titleReadOnly ? undefined : handleTitleChange}
+              onBlur={titleReadOnly ? undefined : handleTitleBlur}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();

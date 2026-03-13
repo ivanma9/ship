@@ -194,6 +194,114 @@ describe('Documents API - PATCH with Issue Fields', () => {
       expect(response.body.properties.estimate).toBe(8)
       expect(response.body.properties.assignee_id).toBe(testUserId)
     })
+
+    it('should return 409 WRITE_CONFLICT when expected_updated_at is stale', async () => {
+      const beforeResult = await pool.query(
+        `SELECT updated_at FROM documents WHERE id = $1`,
+        [testIssueId]
+      )
+      const initialUpdatedAtRaw = beforeResult.rows[0]?.updated_at
+      const initialUpdatedAt = initialUpdatedAtRaw instanceof Date
+        ? initialUpdatedAtRaw.toISOString()
+        : String(initialUpdatedAtRaw)
+
+      const firstUpdate = await request(app)
+        .patch(`/api/documents/${testIssueId}`)
+        .set('Cookie', sessionCookie)
+        .set('x-csrf-token', csrfToken)
+        .send({
+          title: 'First Title Update',
+          expected_updated_at: initialUpdatedAt,
+        })
+
+      expect(firstUpdate.status).toBe(200)
+
+      const staleUpdate = await request(app)
+        .patch(`/api/documents/${testIssueId}`)
+        .set('Cookie', sessionCookie)
+        .set('x-csrf-token', csrfToken)
+        .send({
+          title: 'Stale Title Update',
+          expected_updated_at: initialUpdatedAt,
+        })
+
+      expect(staleUpdate.status).toBe(409)
+      expect(staleUpdate.body.error?.code).toBe('WRITE_CONFLICT')
+      expect(staleUpdate.body.attempted_title).toBe('Stale Title Update')
+      expect(staleUpdate.body.current_updated_at).toBeDefined()
+
+      const finalResult = await pool.query(
+        `SELECT title FROM documents WHERE id = $1`,
+        [testIssueId]
+      )
+      expect(finalResult.rows[0]?.title).toBe('First Title Update')
+    })
+
+    it('should reject title updates with stale expected_updated_at after unrelated document changes', async () => {
+      const beforeResult = await pool.query(
+        `SELECT updated_at FROM documents WHERE id = $1`,
+        [testIssueId]
+      )
+      const initialUpdatedAtRaw = beforeResult.rows[0]?.updated_at
+      const initialUpdatedAt = initialUpdatedAtRaw instanceof Date
+        ? initialUpdatedAtRaw.toISOString()
+        : String(initialUpdatedAtRaw)
+
+      const unrelated = await request(app)
+        .patch(`/api/documents/${testIssueId}`)
+        .set('Cookie', sessionCookie)
+        .set('x-csrf-token', csrfToken)
+        .send({ state: 'in_progress' })
+      expect(unrelated.status).toBe(200)
+
+      const stale = await request(app)
+        .patch(`/api/documents/${testIssueId}`)
+        .set('Cookie', sessionCookie)
+        .set('x-csrf-token', csrfToken)
+        .send({
+          title: 'Conflicting Title',
+          expected_updated_at: initialUpdatedAt,
+        })
+
+      expect(stale.status).toBe(409)
+      expect(stale.body.error?.code).toBe('WRITE_CONFLICT')
+      expect(stale.body.attempted_title).toBe('Conflicting Title')
+    })
+
+    it('should allow retrying a title update with a fresh expected_updated_at token', async () => {
+      const beforeResult = await pool.query(
+        `SELECT updated_at FROM documents WHERE id = $1`,
+        [testIssueId]
+      )
+      const initialUpdatedAtRaw = beforeResult.rows[0]?.updated_at
+      const initialUpdatedAt = initialUpdatedAtRaw instanceof Date
+        ? initialUpdatedAtRaw.toISOString()
+        : String(initialUpdatedAtRaw)
+
+      const firstUpdate = await request(app)
+        .patch(`/api/documents/${testIssueId}`)
+        .set('Cookie', sessionCookie)
+        .set('x-csrf-token', csrfToken)
+        .send({
+          title: 'Retry Safe Title',
+          expected_updated_at: initialUpdatedAt,
+        })
+
+      expect(firstUpdate.status).toBe(200)
+      expect(firstUpdate.body.updated_at).toBeDefined()
+
+      const retry = await request(app)
+        .patch(`/api/documents/${testIssueId}`)
+        .set('Cookie', sessionCookie)
+        .set('x-csrf-token', csrfToken)
+        .send({
+          title: 'Retry Safe Title 2',
+          expected_updated_at: firstUpdate.body.updated_at,
+        })
+
+      expect(retry.status).toBe(200)
+      expect(retry.body.title).toBe('Retry Safe Title 2')
+    })
   })
 })
 

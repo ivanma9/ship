@@ -73,7 +73,15 @@ const loginLimiter = rateLimit({
   max: isTestEnv ? 1000 : 5, // High limit for tests
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+  handler: (_req, res, _next, options) => {
+    res.status(options.statusCode).json({
+      success: false,
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many login attempts. Try again in 15 minutes.',
+      },
+    });
+  },
   skipSuccessfulRequests: true, // Only count failed login attempts
 });
 

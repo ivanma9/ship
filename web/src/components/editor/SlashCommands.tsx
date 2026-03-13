@@ -384,8 +384,20 @@ export function createSlashCommands({ onCreateSubDocument, onNavigateToDocument,
 
             const dataUrl = reader.result as string;
 
-            // Insert image with data URL preview
-            editor.chain().focus().setImage({ src: dataUrl, alt: file.name }).run();
+            // Insert image with a trailing paragraph so follow-up typing lands
+            // after the image instead of replacing a selected image node.
+            editor.chain().focus().insertContent([
+              {
+                type: 'image',
+                attrs: {
+                  src: dataUrl,
+                  alt: file.name,
+                },
+              },
+              {
+                type: 'paragraph',
+              },
+            ]).run();
 
             try {
               // Upload and replace with CDN URL

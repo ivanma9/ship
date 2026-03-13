@@ -9,11 +9,13 @@ import { useProgramsQuery } from '@/hooks/useProgramsQuery';
 import { useProjectsQuery } from '@/hooks/useProjectsQuery';
 import { useDocumentConversion } from '@/hooks/useDocumentConversion';
 import { apiGet, apiPatch, apiDelete, apiPost } from '@/lib/api';
+import { createRequestError, type RequestError } from '@/lib/http-error';
 import { useToast } from '@/components/ui/Toast';
 import { issueKeys } from '@/hooks/useIssuesQuery';
 import { projectKeys, useProjectWeeksQuery } from '@/hooks/useProjectsQuery';
 import { TabBar } from '@/components/ui/TabBar';
 import { useCurrentDocument } from '@/contexts/CurrentDocumentContext';
+import { useRealtimeEvent } from '@/hooks/useRealtimeEvents';
 import {
   getTabsForDocument,
   documentTypeHasTabs,
@@ -52,6 +54,18 @@ export function UnifiedDocumentPage() {
         if (response.status === 404) {
           throw new Error('Document not found');
         }
+        if (response.status === 403) {
+          let message = 'Access denied';
+          try {
+            const data = await response.json();
+            if (data?.error?.message) {
+              message = data.error.message;
+            }
+          } catch {
+            // ignore JSON parse failures and fall back to generic message
+          }
+          throw new Error(message);
+        }
         throw new Error('Failed to fetch document');
       }
       return response.json();
@@ -59,6 +73,13 @@ export function UnifiedDocumentPage() {
     enabled: !!id,
     retry: false,
   });
+
+  useEffect(() => {
+    if (!error) return;
+    if (error.message.toLowerCase().includes('revoked') || error.message.toLowerCase().includes('access denied')) {
+      navigate('/docs', { replace: true });
+    }
+  }, [error, navigate]);
 
   // Sync current document context for rail highlighting
   useEffect(() => {
@@ -153,6 +174,25 @@ export function UnifiedDocumentPage() {
     queryClient.invalidateQueries({ queryKey: ['document', id] });
   }, [queryClient, id]);
 
+  const handleRealtimeTitleUpdate = useCallback((event: { data: Record<string, unknown> }) => {
+    if (!id) return;
+
+    const eventDocumentId = typeof event.data.documentId === 'string' ? event.data.documentId : null;
+    if (eventDocumentId !== id) return;
+
+    const title = typeof event.data.title === 'string' ? event.data.title : undefined;
+    const updatedAt = typeof event.data.updatedAt === 'string' ? event.data.updatedAt : undefined;
+    if (!title || !updatedAt) return;
+
+    queryClient.setQueryData(['document', id], (current: Record<string, unknown> | undefined) => ({
+      ...(current || {}),
+      title,
+      updated_at: updatedAt,
+    }));
+  }, [id, queryClient]);
+
+  useRealtimeEvent('document:title-updated', handleRealtimeTitleUpdate);
+
   // Document conversion (issue <-> project)
   const { convert, isConverting } = useDocumentConversion({
     navigateAfterConvert: true,
@@ -238,7 +278,7 @@ export function UnifiedDocumentPage() {
     mutationFn: async ({ documentId, updates }: { documentId: string; updates: Partial<DocumentResponse> }) => {
       const response = await apiPatch(`/api/documents/${documentId}`, updates);
       if (!response.ok) {
-        throw new Error('Failed to update document');
+        throw await createRequestError(response, 'Failed to update document');
       }
       return response.json();
     },
@@ -257,14 +297,18 @@ export function UnifiedDocumentPage() {
       // Return context with the previous value for rollback
       return { previousDocument, documentId };
     },
-    onError: (_err, _variables, context) => {
+    onError: (err, _variables, context) => {
+      if (!context?.documentId) {
+        return;
+      }
+
       // Rollback to the previous value on error
-      if (context?.previousDocument && context?.documentId) {
+      if (context.previousDocument) {
         queryClient.setQueryData(['document', context.documentId], context.previousDocument);
       }
     },
-    onSuccess: (_, { documentId }) => {
-      queryClient.invalidateQueries({ queryKey: ['document', documentId] });
+    onSuccess: (updatedDocument, { documentId }) => {
+      queryClient.setQueryData(['document', documentId], updatedDocument);
       // Also invalidate type-specific queries for list views
       if (document?.document_type) {
         queryClient.invalidateQueries({ queryKey: [document.document_type + 's', 'list'] });
@@ -291,7 +335,7 @@ export function UnifiedDocumentPage() {
   // Handle update
   const handleUpdate = useCallback(async (updates: Partial<UnifiedDocument>) => {
     if (!id) return;
-    await updateMutation.mutateAsync({ documentId: id, updates: updates as Partial<DocumentResponse> });
+    return updateMutation.mutateAsync({ documentId: id, updates: updates as Partial<DocumentResponse> });
   }, [updateMutation, id]);
 
   // Handle delete

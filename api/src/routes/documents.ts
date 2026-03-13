@@ -3,7 +3,7 @@ import { pool } from '../db/client.js';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
 import { isWorkspaceAdmin } from '../middleware/visibility.js';
-import { handleVisibilityChange, handleDocumentConversion, invalidateDocumentCache, broadcastToUser } from '../collaboration/index.js';
+import { handleVisibilityChange, handleDocumentConversion, invalidateDocumentCache, broadcastToUser, broadcastToWorkspace } from '../collaboration/index.js';
 import { extractHypothesisFromContent, extractSuccessCriteriaFromContent, extractVisionFromContent, extractGoalsFromContent, checkDocumentCompleteness } from '../utils/extractHypothesis.js';
 import { loadContentFromYjsState } from '../utils/yjsConverter.js';
 
@@ -88,6 +88,8 @@ const updateDocumentSchema = z.object({
   status: z.enum(['planning', 'active', 'completed']).optional(),
   hypothesis: z.string().optional(),
   plan: z.string().optional(), // Alias for hypothesis (frontend sends 'plan', stored as 'plan' in properties)
+  expected_title: z.string().optional(), // Legacy optimistic lock for title-only updates
+  expected_updated_at: z.string().optional(), // Optimistic concurrency token (ISO timestamp)
 });
 
 // List documents
@@ -647,6 +649,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     const updates: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
+    let titleValueParamIndex: number | null = null;
 
     // Track extracted values from content (content is source of truth)
     let extractedHypothesis: string | null = null;
@@ -657,6 +660,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     let resubmissionTarget: { sprintId: string; reviewerUserId: string | null } | null = null;
 
     if (data.title !== undefined) {
+      titleValueParamIndex = paramIndex;
       updates.push(`title = $${paramIndex++}`);
       values.push(data.title);
     }
@@ -931,10 +935,62 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
       updates.push(`updated_at = now()`);
     }
 
+    const whereClauses = [`id = $${paramIndex}`, `workspace_id = $${paramIndex + 1}`];
+    const updateValues: any[] = [...values, id, workspaceId];
+    const expectedParamIndex = paramIndex + 2;
+    const hasUpdatedAtLock = data.expected_updated_at !== undefined;
+    const hasTitleLock = !hasUpdatedAtLock
+      && data.title !== undefined
+      && data.expected_title !== undefined
+      && titleValueParamIndex !== null;
+    if (hasTitleLock) {
+      // Title-focused optimistic lock:
+      // - Allow update if current title is still expected_title (normal optimistic path)
+      // - Also allow if current title already equals incoming title (idempotent repeat save)
+      whereClauses.push(`(title = $${expectedParamIndex} OR title = $${titleValueParamIndex})`);
+      updateValues.push(data.expected_title);
+    } else if (hasUpdatedAtLock) {
+      whereClauses.push(`date_trunc('milliseconds', updated_at) = date_trunc('milliseconds', $${expectedParamIndex}::timestamptz)`);
+      updateValues.push(data.expected_updated_at);
+    }
+
     const result = await client.query(
-      `UPDATE documents SET ${updates.join(', ')} WHERE id = $${paramIndex} AND workspace_id = $${paramIndex + 1} RETURNING *`,
-      [...values, id, workspaceId]
+      `UPDATE documents SET ${updates.join(', ')} WHERE ${whereClauses.join(' AND ')} RETURNING *`,
+      updateValues
     );
+
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+
+      // If optimistic concurrency was requested, return a write-conflict response.
+      if (hasTitleLock || data.expected_updated_at !== undefined) {
+        const currentResult = await pool.query(
+          `SELECT title, updated_at FROM documents WHERE id = $1 AND workspace_id = $2`,
+          [id, workspaceId]
+        );
+
+        if (currentResult.rows.length === 0) {
+          res.status(404).json({ error: 'Document not found' });
+          return;
+        }
+
+        console.warn(`[documents] WRITE_CONFLICT document=${id} workspace=${workspaceId} user=${userId}`);
+        res.status(409).json({
+          error: {
+            code: 'WRITE_CONFLICT',
+            message: 'Document was updated by another user. Refresh to get the latest changes before retrying.',
+          },
+          attempted_title: data.title,
+          current_title: currentResult.rows[0].title,
+          current_updated_at: currentResult.rows[0].updated_at,
+        });
+        return;
+      }
+
+      // Without optimistic concurrency token, this means the document disappeared mid-transaction.
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
 
     // When a weekly plan/retro is edited after changes were requested, move it back to re-review.
     if (contentUpdated && (existing.document_type === 'weekly_plan' || existing.document_type === 'weekly_retro')) {
@@ -1024,6 +1080,14 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
       invalidateDocumentCache(id);
     }
 
+    if (data.title !== undefined) {
+      broadcastToWorkspace(workspaceId, 'document:title-updated', {
+        documentId: id,
+        title: result.rows[0].title,
+        updatedAt: result.rows[0].updated_at,
+      });
+    }
+
     // Notify WebSocket collaboration server to disconnect users who lost access
     if (data.visibility !== undefined && data.visibility !== existing.visibility) {
       handleVisibilityChange(id, data.visibility, existing.created_by).catch((err) => {
@@ -1065,6 +1129,29 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
       }
     }
 
+    let belongs_to: Array<{ id: string; type: string; title?: string; color?: string }> = [];
+    if (
+      updatedDoc.document_type === 'issue' ||
+      updatedDoc.document_type === 'wiki' ||
+      updatedDoc.document_type === 'sprint' ||
+      updatedDoc.document_type === 'project'
+    ) {
+      const assocResult = await pool.query(
+        `SELECT da.related_id as id, da.relationship_type as type,
+                d.title, (d.properties->>'color') as color
+         FROM document_associations da
+         LEFT JOIN documents d ON d.id = da.related_id
+         WHERE da.document_id = $1`,
+        [id]
+      );
+      belongs_to = assocResult.rows.map(row => ({
+        id: row.id,
+        type: row.type,
+        title: row.title || undefined,
+        color: row.color || undefined,
+      }));
+    }
+
     res.json({
       ...updatedDoc,
       // Issue properties
@@ -1088,6 +1175,12 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
       plan_approval: props.plan_approval,
       review_approval: props.review_approval,
       review_rating: props.review_rating,
+      ...(
+        (updatedDoc.document_type === 'issue' ||
+          updatedDoc.document_type === 'wiki' ||
+          updatedDoc.document_type === 'sprint' ||
+          updatedDoc.document_type === 'project') && { belongs_to }
+      ),
     });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});

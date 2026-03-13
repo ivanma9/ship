@@ -297,7 +297,12 @@ export function ReviewsPage() {
     try {
       setLoading(true);
       const res = await apiGet(`/api/team/reviews?sprint_count=8`);
-      if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+      if (!res.ok) {
+        if (res.status === 403) {
+          throw new Error('Reviews are only available to workspace admins.');
+        }
+        throw new Error(`Failed to fetch: ${res.status}`);
+      }
       const json = await res.json();
       setData(json);
     } catch (err) {

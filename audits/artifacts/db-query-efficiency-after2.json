@@ -1,53 +1,73 @@
-CAIA not configured, skipping initialization
 {
-  "at": "2026-03-10T06:36:21.914Z",
+  "at": "2026-03-13T01:11:57.460Z",
   "flows": [
     {
+      "flowKey": "load_main_page",
       "flow": "Load main page",
       "totalQueries": 53,
-      "slowestMs": 3.16,
-      "slowestSql": "SELECT id, workspace_id, document_type, title, parent_id, position, ticket_number, properties, created_at, updated_at, created_by, visibility FROM documents WHERE workspace_id = $1 AND archived_at IS NULL AND deleted_at IS NULL AND (visibility = 'workspace' OR created_by = $2 OR $3 = TRUE) ORDER BY position ASC, created_at DESC",
+      "slowestMs": 3.22,
+      "slowestSql": "SELECT d.id, d.title, d.properties, prog_da.related_id as program_id, d.archived_at, d.created_at, d.updated_at, d.converted_from_id, (d.properties->>'owner_id')::uuid as owner_id, u.name as owner_name, u.email as owner_email, (SELECT COUNT(*) FROM documents s JOIN document_associations da ON da.document_id = s.id AND da.related_id = d.id AND da.relationship_type = 'project' WHERE s.document_type = 'sprint') as sprint_count, (SELECT COUNT(*) FROM documents i JOIN document_associations da ON da.document_id = i.id AND da.related_id = d.id AND da.relationship_type = 'project' WHERE i.document_type = 'issue') as issue_count, ( CASE WHEN d.archived_at IS NOT NULL THEN 'archived' WHEN d.properties->>'plan_validated' IS NOT NULL THEN 'completed' ELSE COALESCE( ( SELECT CASE MAX( CASE -- Compute sprint timing: current=3, future=2, past=1 WHEN CURRENT_DATE BETWEEN (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7) AND (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7 + 6) THEN 3 -- current sprint WHEN CURRENT_DATE < (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7) THEN 2 -- future sprint ELSE 1 -- past sprint END ) WHEN 3 THEN 'active' WHEN 2 THEN 'planned' ELSE NULL -- past allocations don't count END FROM documents sprint JOIN workspaces w ON w.id = sprint.workspace_id WHERE sprint.document_type = 'sprint' AND sprint.workspace_id = d.workspace_id AND (sprint.properties->>'project_id')::uuid = d.id AND jsonb_array_length(COALESCE(sprint.properties->'assignee_ids', '[]'::jsonb)) > 0 ), 'backlog' ) END ) as inferred_status FROM documents d LEFT JOIN users u ON u.id = (d.properties->>'owner_id')::uuid LEFT JOIN document_associations prog_da ON prog_da.document_id = d.id AND prog_da.relationship_type = 'program' WHERE d.workspace_id = $1 AND d.document_type = 'project' AND (d.visibility = 'workspace' OR d.created_by = $2 OR $3 = TRUE) AND d.archived_at IS NULL ORDER BY ((COALESCE((d.properties->>'impact')::int, 3) * COALESCE((d.properties->>'confidence')::int, 3) * COALESCE((d.properties->>'ease')::int, 3))) DESC",
       "nPlusOneDetected": true,
-      "repeatedQueryCount": 9
+      "repeatedQueryCount": 9,
+      "targetQueryCount": null
     },
     {
+      "flowKey": "view_document",
       "flow": "View a document",
       "totalQueries": 16,
-      "slowestMs": 1.97,
+      "slowestMs": 2.29,
       "slowestSql": "SELECT d.id, d.title, d.properties, prog_da.related_id as program_id, d.archived_at, d.created_at, d.updated_at, d.converted_from_id, (d.properties->>'owner_id')::uuid as owner_id, u.name as owner_name, u.email as owner_email, (SELECT COUNT(*) FROM documents s JOIN document_associations da ON da.document_id = s.id AND da.related_id = d.id AND da.relationship_type = 'project' WHERE s.document_type = 'sprint') as sprint_count, (SELECT COUNT(*) FROM documents i JOIN document_associations da ON da.document_id = i.id AND da.related_id = d.id AND da.relationship_type = 'project' WHERE i.document_type = 'issue') as issue_count, ( CASE WHEN d.archived_at IS NOT NULL THEN 'archived' WHEN d.properties->>'plan_validated' IS NOT NULL THEN 'completed' ELSE COALESCE( ( SELECT CASE MAX( CASE -- Compute sprint timing: current=3, future=2, past=1 WHEN CURRENT_DATE BETWEEN (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7) AND (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7 + 6) THEN 3 -- current sprint WHEN CURRENT_DATE < (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7) THEN 2 -- future sprint ELSE 1 -- past sprint END ) WHEN 3 THEN 'active' WHEN 2 THEN 'planned' ELSE NULL -- past allocations don't count END FROM documents sprint JOIN workspaces w ON w.id = sprint.workspace_id WHERE sprint.document_type = 'sprint' AND sprint.workspace_id = d.workspace_id AND (sprint.properties->>'project_id')::uuid = d.id AND jsonb_array_length(COALESCE(sprint.properties->'assignee_ids', '[]'::jsonb)) > 0 ), 'backlog' ) END ) as inferred_status FROM documents d LEFT JOIN users u ON u.id = (d.properties->>'owner_id')::uuid LEFT JOIN document_associations prog_da ON prog_da.document_id = d.id AND prog_da.relationship_type = 'program' WHERE d.workspace_id = $1 AND d.document_type = 'project' AND (d.visibility = 'workspace' OR d.created_by = $2 OR $3 = TRUE) AND d.archived_at IS NULL ORDER BY ((COALESCE((d.properties->>'impact')::int, 3) * COALESCE((d.properties->>'confidence')::int, 3) * COALESCE((d.properties->>'ease')::int, 3))) DESC",
       "nPlusOneDetected": false,
-      "repeatedQueryCount": 4
+      "repeatedQueryCount": 4,
+      "targetQueryCount": null
     },
     {
+      "flowKey": "list_issues",
       "flow": "List issues",
       "totalQueries": 17,
-      "slowestMs": 1.87,
+      "slowestMs": 2.32,
       "slowestSql": "SELECT d.id, d.title, d.properties, prog_da.related_id as program_id, d.archived_at, d.created_at, d.updated_at, d.converted_from_id, (d.properties->>'owner_id')::uuid as owner_id, u.name as owner_name, u.email as owner_email, (SELECT COUNT(*) FROM documents s JOIN document_associations da ON da.document_id = s.id AND da.related_id = d.id AND da.relationship_type = 'project' WHERE s.document_type = 'sprint') as sprint_count, (SELECT COUNT(*) FROM documents i JOIN document_associations da ON da.document_id = i.id AND da.related_id = d.id AND da.relationship_type = 'project' WHERE i.document_type = 'issue') as issue_count, ( CASE WHEN d.archived_at IS NOT NULL THEN 'archived' WHEN d.properties->>'plan_validated' IS NOT NULL THEN 'completed' ELSE COALESCE( ( SELECT CASE MAX( CASE -- Compute sprint timing: current=3, future=2, past=1 WHEN CURRENT_DATE BETWEEN (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7) AND (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7 + 6) THEN 3 -- current sprint WHEN CURRENT_DATE < (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7) THEN 2 -- future sprint ELSE 1 -- past sprint END ) WHEN 3 THEN 'active' WHEN 2 THEN 'planned' ELSE NULL -- past allocations don't count END FROM documents sprint JOIN workspaces w ON w.id = sprint.workspace_id WHERE sprint.document_type = 'sprint' AND sprint.workspace_id = d.workspace_id AND (sprint.properties->>'project_id')::uuid = d.id AND jsonb_array_length(COALESCE(sprint.properties->'assignee_ids', '[]'::jsonb)) > 0 ), 'backlog' ) END ) as inferred_status FROM documents d LEFT JOIN users u ON u.id = (d.properties->>'owner_id')::uuid LEFT JOIN document_associations prog_da ON prog_da.document_id = d.id AND prog_da.relationship_type = 'program' WHERE d.workspace_id = $1 AND d.document_type = 'project' AND (d.visibility = 'workspace' OR d.created_by = $2 OR $3 = TRUE) AND d.archived_at IS NULL ORDER BY ((COALESCE((d.properties->>'impact')::int, 3) * COALESCE((d.properties->>'confidence')::int, 3) * COALESCE((d.properties->>'ease')::int, 3))) DESC",
       "nPlusOneDetected": false,
-      "repeatedQueryCount": 4
+      "repeatedQueryCount": 4,
+      "targetQueryCount": null
     },
     {
+      "flowKey": "load_sprint_board",
       "flow": "Load sprint board",
       "totalQueries": 14,
-      "slowestMs": 1.67,
-      "slowestSql": "SELECT d.id, d.title, d.properties, prog_da.related_id as program_id, p.title as program_name, p.properties->>'prefix' as program_prefix, p.properties->>'accountable_id' as program_accountable_id, (SELECT op.properties->>'reports_to' FROM documents op WHERE d.properties->>'owner_id' IS NOT NULL AND op.id = (d.properties->>'owner_id')::uuid AND op.document_type = 'person' AND op.workspace_id = d.workspace_id) as owner_reports_to, w.sprint_start_date as workspace_sprint_start_date, u.id as owner_id, u.name as owner_name, u.email as owner_email, (SELECT COUNT(*) FROM documents i JOIN document_associations ida ON ida.document_id = i.id AND ida.related_id = d.id AND ida.relationship_type = 'sprint' WHERE i.document_type = 'issue') as issue_count, (SELECT COUNT(*) FROM documents i JOIN document_associations ida ON ida.document_id = i.id AND ida.related_id = d.id AND ida.relationship_type = 'sprint' WHERE i.document_type = 'issue' AND i.properties->>'state' = 'done') as completed_count, (SELECT COUNT(*) FROM documents i JOIN document_associations ida ON ida.document_id = i.id AND ida.related_id = d.id AND ida.relationship_type = 'sprint' WHERE i.document_type = 'issue' AND i.properties->>'state' IN ('in_progress', 'in_review')) as started_count, (SELECT COUNT(*) > 0 FROM documents pl WHERE pl.parent_id = d.id AND pl.document_type = 'weekly_plan') as has_plan, (SELECT COUNT(*) > 0 FROM documents rt JOIN document_associations rda ON rda.document_id = rt.id AND rda.related_id = d.id AND rda.relationship_type = 'sprint' WHERE rt.properties->>'outcome' IS NOT NULL) as has_retro, (SELECT rt.properties->>'outcome' FROM documents rt JOIN document_associations rda ON rda.document_id = rt.id AND rda.related_id = d.id AND rda.relationship_type = 'sprint' WHERE rt.properties->>'outcome' IS NOT NULL LIMIT 1) as retro_outcome, (SELECT rt.id FROM documents rt JOIN document_associations rda ON rda.document_id = rt.id AND rda.related_id = d.id AND rda.relationship_type = 'sprint' WHERE rt.properties->>'outcome' IS NOT NULL LIMIT 1) as retro_id FROM documents d LEFT JOIN document_associations prog_da ON prog_da.document_id = d.id AND prog_da.relationship_type = 'program' LEFT JOIN documents p ON prog_da.related_id = p.id JOIN workspaces w ON d.workspace_id = w.id LEFT JOIN users u ON (d.properties->'assignee_ids'->>0)::uuid = u.id WHERE d.id = $1 AND d.workspace_id = $2 AND d.document_type = 'sprint' AND (d.visibility = 'workspace' OR d.created_by = $3 OR $4 = TRUE)",
-      "nPlusOneDetected": false,
-      "repeatedQueryCount": 3
-    },
-    {
-      "flow": "Search content",
-      "totalQueries": 4,
-      "slowestMs": 1.18,
+      "slowestMs": 73.62,
       "slowestSql": "UPDATE sessions SET last_activity = $1 WHERE id = $2",
       "nPlusOneDetected": false,
-      "repeatedQueryCount": 1
+      "repeatedQueryCount": 3,
+      "targetQueryCount": null
+    },
+    {
+      "flowKey": "accountability_action_items",
+      "flow": "Accountability action-items",
+      "totalQueries": 13,
+      "slowestMs": 25.41,
+      "slowestSql": "SELECT s.id as sprint_id, (s.properties->>'sprint_number')::int as sprint_number, s.properties->'plan_approval' as plan_approval, s.properties->'review_approval' as review_approval, s.title as sprint_title, da.related_id as project_id FROM documents s LEFT JOIN document_associations da ON da.document_id = s.id AND da.relationship_type = 'project' WHERE s.workspace_id = $1 AND s.document_type = 'sprint' AND s.deleted_at IS NULL AND $2 = ANY( SELECT jsonb_array_elements_text(s.properties->'assignee_ids') ) AND ( s.properties->'plan_approval'->>'state' = 'changes_requested' OR s.properties->'review_approval'->>'state' = 'changes_requested' )",
+      "nPlusOneDetected": false,
+      "repeatedQueryCount": 2,
+      "targetQueryCount": null
+    },
+    {
+      "flowKey": "search_content",
+      "flow": "Search content",
+      "totalQueries": 4,
+      "slowestMs": 4.96,
+      "slowestSql": "SELECT s.id, s.user_id, s.workspace_id, s.expires_at, s.last_activity, s.created_at, u.is_super_admin FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.id = $1",
+      "nPlusOneDetected": false,
+      "repeatedQueryCount": 1,
+      "targetQueryCount": 4
     }
   ],
   "slowestOverall": {
-    "text": "SELECT u.id, u.email, u.password_hash, u.name, u.is_super_admin, u.last_workspace_id\n       FROM users u\n       WHERE LOWER(u.email) = LOWER($1)",
+    "text": "UPDATE sessions SET last_activity = $1 WHERE id = $2",
     "values": [
-      "dev@ship.local"
+      "2026-03-13T01:11:57.293Z",
+      "3f97ed0475677f9009cb284487e8fad22c4134d5e4e5bdc0ca50b253873c69e0"
     ],
-    "durationMs": 22.162375
+    "durationMs": 73.624167
   }
 }

@@ -156,7 +156,7 @@ node .tmp_type_safety_audit.cjs > /tmp/type_safety_results.json
   - No production-vs-test filtering in baseline counts
   - No runtime trace validation
 
-### 7. Improvement Plan (25% Core Reduction)
+### 7. Improvement Plan
 
 - Goal: Reduce core type-safety violations by at least 25% without behavior changes
 - Core scope: `any` + `as` + `!` + `@ts-ignore/@ts-expect-error`
@@ -301,6 +301,15 @@ Unused dependency candidates from static scan:
 - This audit is diagnostic only.
 - No code or dependency fixes were applied in this pass.
 
+### 9. Improvement Plan
+
+- **Goal:** Reduce entry chunk size and improve first-load performance.
+- **Targets:**
+  1. Lazy-load `emoji-picker-react`, `highlight.js`, and `yjs` where feasible.
+  2. Resolve Vite static/dynamic import conflicts for `upload.ts` and `FileAttachment.tsx`.
+  3. Evaluate and remove `@tanstack/query-sync-storage-persister` if unused.
+  4. Re-run `pnpm --filter @ship/web run build:analyze` and record before/after payload deltas.
+
 ---
 
 ## 3. API Response Time
@@ -378,7 +387,7 @@ Metric format for this table: `(ab/k6)` in milliseconds.
 
 ### Improvement Plan
 
-- Goal: reduce P95 by 20% on at least two endpoints under identical benchmark conditions.
+- **Goal:** Reduce P95 by 20% on at least two endpoints under identical benchmark conditions.
 - Primary targets (AB c50 baseline):
   - `/api/documents?type=wiki`: `123ms` -> `<=98ms`
   - `/api/issues`: `105ms` -> `<=84ms`
@@ -401,83 +410,90 @@ Method: Instrumented `pool.query` at the API layer and replayed five authenticat
 
 ### Summary
 
-- Baseline query counts were captured for five core flows.
-- Two concrete inefficiencies were found: an N+1 pattern in action-items and an extra round-trip in mention search.
-- Proposed changes are **not applied yet**. If applied, they reduce Search content from 5 to 4 queries (20%).
-- In the audited search query family, estimated execution time drops from 0.979 ms to 0.360 ms (~63.2% faster).
+- Baseline query counts were captured on March 10, 2026 and the optimized flows were rerun on March 13, 2026 using the same audit harness.
+- The mention-search change is applied and reduces Search content from 5 queries to 4 queries in both post-change reruns.
+- The accountability batching change is applied and the dedicated `GET /api/accountability/action-items` audit flow now completes with 13 queries, `repeatedQueryCount = 2`, and `nPlusOneDetected = false`.
+- On current seeded data, the merged search query does **not** reproduce the earlier projected ~63% speedup; the measured same-seed `EXPLAIN ANALYZE` delta is 0.719 ms -> 0.702 ms (~2.4% faster).
+- The optional title-search index migration was **not** added because the 4-query target is met and the seeded reruns show stable query counts across repeated runs.
 
 ### Audit Deliverable
 
-| User Flow         | Total Queries | Slowest Query (ms) | N+1 Detected? |
-| ----------------- | ------------- | ------------------ | ------------- |
-| Load main page    | 54            | 3.39 ms            | Yes           |
-| View a document   | 16            | 2.29 ms            | No            |
-| List issues       | 17            | 2.40 ms            | No            |
-| Load sprint board | 14            | 2.24 ms            | No            |
-| Search content    | 5             | 1.00 ms            | No            |
+| User Flow                    | Baseline Queries | After Queries | After2 Queries | Notes |
+| ---------------------------- | ---------------- | ------------- | -------------- | ----- |
+| Load main page               | 54               | 53            | 53             | One-query reduction preserved; broader page still has other repeated-query hotspots outside this feature |
+| View a document              | 16               | 16            | 16             | Unchanged |
+| List issues                  | 17               | 17            | 17             | Unchanged |
+| Load sprint board            | 14               | 14            | 14             | Unchanged |
+| Search content               | 5                | 4             | 4              | Target met; stable across reruns |
+| Accountability action-items  | N/A              | 13            | 13             | Dedicated flow added in the post-change harness; repeated-query heuristic cleared (`2`, not N+1) |
 
 ### Inefficiencies Identified
 
-1. `GET /api/accountability/action-items` has N+1 behavior in `checkMissingStandups` and `checkSprintAccountability` (`api/src/services/accountability.ts`).
-   - Each sprint triggered separate queries for standup existence, last standup date, and issue counts.
-2. `GET /api/search/mentions` executes separate database queries for people and documents (`api/src/routes/search.ts`).
-   - This adds one extra query to each search request.
-3. Search by title uses `%ILIKE%` on `documents.title`.
-   - `EXPLAIN ANALYZE` shows a sequential scan on content documents for this dataset.
+1. `GET /api/accountability/action-items` previously repeated standup and sprint-support lookups per sprint and per allocation in `api/src/services/accountability.ts`.
+   - The updated implementation now batches standup status, sprint issue counts, and weekly plan/retro fetches while preserving derived item behavior.
+2. `GET /api/search/mentions` previously issued separate database queries for people and documents in `api/src/routes/search.ts`.
+   - The updated implementation now uses one CTE + `UNION ALL` statement and reconstructs the existing `{ people, documents }` response in TypeScript.
+3. Search by title still uses `%ILIKE%` on `documents.title`.
+   - Same-seed `EXPLAIN ANALYZE` continues to show a sequential scan for the document portion of the search query family, but the observed execution time remains low enough that the optional trigram index was deferred.
 
-### Proposed Improvements (Not Applied)
+### Measured Metrics
 
-- In `api/src/services/accountability.ts`:
-  - Batch per-sprint standup checks and last-standup lookups into set-based queries.
-  - Batch sprint issue counts instead of querying once per sprint.
-- In `api/src/routes/search.ts`:
-  - Merge people and document search into one SQL statement (CTEs + `UNION ALL`) while preserving per-source limits.
+| User Flow                   | Total Queries (Before) | Total Queries (After) | Improvement |
+| --------------------------- | ---------------------- | --------------------- | ----------- |
+| Load main page              | 54                     | 53                    | 1.9%        |
+| View a document             | 16                     | 16                    | 0.0%        |
+| List issues                 | 17                     | 17                    | 0.0%        |
+| Load sprint board           | 14                     | 14                    | 0.0%        |
+| Search content              | 5                      | 4                     | **20.0%**   |
+| Accountability action-items | N/A                    | 13                    | Dedicated direct measurement added after implementation |
 
-### Projected Metrics (If Applied)
+Target status:
 
-| User Flow         | Total Queries (Before) | Total Queries (Projected) | Improvement |
-| ----------------- | ---------------------- | ------------------------- | ----------- |
-| Load main page    | 54                     | 53                        | 1.9%        |
-| View a document   | 16                     | 16                        | 0.0%        |
-| List issues       | 17                     | 17                        | 0.0%        |
-| Load sprint board | 14                     | 14                        | 0.0%        |
-| Search content    | 5                      | 4                         | **20.0%**   |
-
-Target status: **Would be met if applied** (20% reduction in one audited flow: Search content).
+- **Query-count target met** for Search content (`5 -> 4`).
+- **Behavior-preservation target met** in targeted API tests for search and accountability.
+- **Accountability batching target met** for repeated-query elimination (`nPlusOneDetected = false` in the dedicated action-items flow).
+- **Original ~63% search latency projection not reproduced** on current seeded data; the measured delta is published below instead of reusing the projection.
 
 Calculation:
 
 - Baseline Search content flow: 5 queries
-- Projected Search content flow: 4 queries
+- Measured Search content flow: 4 queries
 - Reduction: `(5 - 4) / 5 = 0.20` -> **20%**
 
 ### EXPLAIN ANALYZE Snapshot
 
 Query family: Search content (`/api/search/mentions?q=pro`)
 
-#### Before (Two DB Queries)
+#### Before (Legacy two-query path, rerun on current seeded data)
 
-- `old_people`: Execution Time **0.251 ms**
-- `old_docs`: Execution Time **0.728 ms**
-- Combined execution time: **0.979 ms**
+- `old_people`: Execution Time **0.095 ms**
+- `old_docs`: Execution Time **0.624 ms**
+- Combined execution time: **0.719 ms**
 
 Plan highlights:
 
-- `old_people`: Bitmap Heap Scan on `documents` filtered by `document_type='person'`
+- `old_people`: Index Scan using `idx_documents_active`
 - `old_docs`: Seq Scan on `documents` with `title ILIKE '%pro%'`
 
-#### After (Single Combined DB Query)
+#### After (Single combined DB query, current implementation)
 
-- `new_combined`: Execution Time **0.360 ms**
+- `new_combined`: Execution Time **0.702 ms**
 
 Plan highlights:
 
 - Single `Append` plan with `people` and `content_docs` subqueries
 - Same filter semantics and per-subquery limits preserved
+- Document branch still uses a sequential scan on this seeded dataset
 
 Execution-time delta (query family):
 
-- **0.979 ms -> 0.360 ms (~63.2% faster)**
+- **0.719 ms -> 0.702 ms (~2.4% faster)**
+
+Rerun stability notes:
+
+- `Search content` measured 4 queries in both post-change audit snapshots.
+- `Accountability action-items` measured 13 queries with `repeatedQueryCount = 2` in both post-change audit snapshots.
+- No plan instability was observed across the two post-change harness runs for the targeted flows.
 
 ### Files Changed
 
@@ -485,7 +501,16 @@ Execution-time delta (query family):
 - `audits/artifacts/db-query-efficiency-baseline.json`
 - `audits/artifacts/db-query-efficiency-after.json`
 - `audits/artifacts/db-query-efficiency-after2.json`
-- `audits/database-query-efficiency-audit-2026-03-10.md`
+- `audits/consolidated-audit-report-2026-03-10.md`
+
+### Improvement Plan
+
+- **Goal:** Reduce query count and execution time for audited flows.
+- **Applied changes:**
+  - In `api/src/services/accountability.ts`: Batched standup checks, sprint issue counts, and weekly plan/retro lookups.
+  - In `api/src/routes/search.ts`: Merged people and document search into one SQL statement (CTEs + `UNION ALL`) while preserving per-source limits.
+- **Migration decision:** No `038_query_efficiency_indexes.sql` was added because repeated seeded reruns were stable and the current query family remained fast enough without extra index scope.
+- **Residual risk:** The document-search branch still uses a sequential scan for `%ILIKE%` title search. Revisit the optional trigram index only if production-like seeded data grows enough to make this path materially slower.
 
 ---
 
@@ -497,11 +522,11 @@ Execution-time delta (query family):
 
 | Metric                            | Your Baseline                                                                                                                                                                                                                              |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Total tests                       | 1,471 (API: 451 + Web: 151 + E2E: 869)                                                                                                                                                                                                     |
-| Pass / Fail / Flaky               | 451 / 0 / 0 (pnpm test)                                                                                                                                                                                                                    |
+| Total tests                       | 1,479 listed across API, Web, and E2E after adding 3 critical-flow specs (API: 451 + Web: 156 + prior E2E baseline 869 + 3 new targeted specs)                                                                                          |
+| Pass / Fail / Flaky               | Verified reruns: API 451 / 0 / 0 (`pnpm test` baseline), Web 156 / 0 / 0 (`pnpm --filter @ship/web test:coverage -- --reporter=dot` on 2026-03-11); Layer 2 targeted E2E grouped reruns on 2026-03-12 ended clean after 2 documented old-test stabilizations and 2 expected skips in `e2e/data-integrity.spec.ts` |
 | Suite runtime                     | 20.88 s (pnpm test)                                                                                                                                                                                                                        |
-| Critical flows with zero coverage | 1) Concurrent same-document edit convergence with persisted reload verification 2) Offline edit queue replay exactly-once semantics after reconnect 3) RBAC revocation during active collaboration (write rejection + persistence check) |
-| Code coverage % (if measured)     | web: 28.53% lines / 19.38% branches / api: 40.52% lines / 33.44% branches (Web measured with `coverage.reportOnFailure=true` while 13 tests fail)                                                                                          |
+| Critical flows with zero coverage | 0 after adding explicit specs for convergence, offline replay exactly-once, and active-collaboration RBAC revocation; grouped runner evidence was published on 2026-03-12                                                                     |
+| Code coverage % (if measured)     | web: 33.93% lines / 22.97% branches / 33.03% statements / 31.06% functions after deterministic fixes; api: 40.52% lines / 33.44% branches from prior baseline                                                                           |
 
 ### 1. Scope and Intent
 
@@ -526,14 +551,14 @@ Execution-time delta (query family):
 
 ### 3. Findings (Ranked)
 
-1. **P1 - Web coverage baseline reliability is constrained by failing web tests**
-   - Evidence: coverage now runs, but Web coverage execution still reports 13 test failures.
-   - Impact: web line/branch percentages are measurable but reliability is reduced until failing tests are resolved.
-   - Scope: `web` unit test suite and web coverage quality gates.
+1. **P1 - Web deterministic failure set is resolved, and the remaining risk has narrowed to residual full-suite E2E drift outside the targeted reliability slices**
+   - Evidence: `pnpm --filter @ship/web test:coverage -- --reporter=dot` now passes 19/19 files and 156/156 tests on 2026-03-11.
+   - Impact: the web suite is trustworthy again as a gate; the targeted reliability E2E subset has now also been executed group-by-group with final clean reruns.
+   - Scope: web unit test suite, targeted collaboration E2E subset, and final release baseline publication.
 
-2. **P1 - Real-time sync/concurrency tests are underrepresented**
-   - Evidence: only 4 sync-focused specs out of 71 (`autosave-race-conditions`, `content-caching`, `my-week-stale-data`, `race-conditions`).
-   - Impact: stale-write, lost-update, and ordering regressions may escape detection.
+2. **P1 - Real-time sync/concurrency coverage is materially improved and now has runner-backed evidence**
+   - Evidence: the feature adds 3 targeted specs for overlap convergence, offline replay exactly-once, and active-session RBAC revocation, and the grouped 2026-03-12 run finished with those specs passing after deterministic setup hardening where needed.
+   - Impact: the prior missing logic gap is now closed at both the spec and execution-evidence layers for the scoped reliability subset.
    - Scope: editor + WebSocket/Yjs collaboration.
 
 3. **P1 - Extensive fixed waits increase flake risk**
@@ -545,9 +570,9 @@ Execution-time delta (query family):
    - Evidence: 3/3 runs clean; stable runtime band.
    - Impact: good confidence for API regression checks.
 
-5. **P2 - Web unit suite currently has deterministic failures**
-   - Evidence: `pnpm --filter @ship/web test -- --coverage --run --reporter=dot` reported 13 failed tests.
-   - Impact: weak web test signal and reduced confidence in web coverage quality.
+5. **P2 - The old 13-failure web set collapsed into three root-cause groups**
+   - Evidence: repaired failures fell into schema/assertion drift (`DetailsExtension.test.ts`), product-model expectation drift (`document-tabs.test.ts`), and fetch mock incompatibility with real `Response` parsing (`useSessionTimeout.test.ts`).
+   - Impact: similar drift can recur if shared test helpers and domain defaults change without corresponding test fixture updates.
 
 ### 4. Critical-Flow Traceability
 
@@ -581,7 +606,8 @@ Execution-time delta (query family):
 - Coverage runtime status:
   - Operational for both packages (`Coverage enabled with v8`).
 - Current caveat:
-  - Web run has 13 failing tests; used `coverage.reportOnFailure=true` to emit numeric coverage anyway.
+  - Web run now passes cleanly after the 2026-03-11 deterministic fixes.
+  - Targeted E2E summary fields were extended to emit `flaky` and `retried` counters, and the scoped Layer 2 grouped execution was completed on 2026-03-12; broader full-suite publication outside those slices is still separate work.
 - `api/vitest.config.ts` and `web/vitest.config.ts` now both use `coverage.provider: 'v8'`.
 - Playwright is not currently configured to emit app code coverage artifacts.
 - To produce E2E coverage metrics, the app needs instrumentation (for example Istanbul) plus a merge/report pipeline.
@@ -594,34 +620,97 @@ Execution-time delta (query family):
 
 Flaky tests observed in this command path: **0**.
 
-### 8. Improvement Target and Plan
+### 8. Residual Risk Summary
 
-- Coverage unlock goal:
-  - Keep runnable coverage active in `api` and `web` and improve both line/branch baselines over time.
-- Reliability goal:
-  - Resolve the current 13 deterministic Web unit test failures, then re-run Web coverage without `coverage.reportOnFailure=true`.
-  - Replace fixed-wait patterns (`waitForTimeout`) in high-risk E2E specs with event/assertion-based waits.
-  - Track flaky rate with repeated baseline runs and record trend in this report.
-- Flow goal:
-  - Add 3 E2E scenarios for current dark logic gaps:
-    - concurrent same-document overlap edit convergence,
-    - offline edit replay exactly-once,
-    - RBAC revocation during active collaboration.
-- Reporting goal:
-  - Re-run audit after coverage/runtime fixes and update Section 9 with numeric coverage percentages and refreshed Pass/Fail/Flaky/runtime baselines.
-
-### 9. Residual Risk Summary
-
-- Highest risk: collaboration correctness during concurrent edits, reconnects, and permission transitions.
-- Confidence: medium-high for measured baselines; medium for dark-logic inference (mapping + config analysis).
+- Highest risk: broader E2E drift outside the remediated reliability slices, plus any remaining environment-sensitive collaboration timing under full-suite pressure.
+- Confidence: high for the repaired web baseline; medium-high for the targeted E2E scenarios after the 2026-03-12 grouped reruns and documented old-test contract adjustments.
 - Blind spots:
   - No CI-history flake-rate sampling in this audit.
-  - Web coverage percentages are currently sampled with failing tests present; treat as provisional until web suite is stabilized.
+  - This report captures the targeted reliability slices, not an every-spec Playwright full-suite rerun.
 
-### 10. Audit Boundary Reminder
+### 9. Audit Boundary Reminder
 
-- This report is diagnosis only.
-- No fixes were implemented during this audit.
+- This report started as diagnosis only, then was refreshed on 2026-03-11 with implementation evidence for the deterministic web fixes, scoped E2E helper work, and new critical-flow spec additions.
+
+### 10. 2026-03-11 Reliability Remediation Update
+
+#### Root-cause groups for the former 13 deterministic web failures
+
+1. **Domain expectation drift**
+   - `web/src/lib/document-tabs.test.ts` still asserted legacy sprint-tab behavior after the product model moved to weeks-first navigation and updated project defaults.
+   - Fix: update tab expectations to match the current tab contract rather than the retired sprint assumptions.
+
+2. **Editor schema assertion drift**
+   - `web/src/components/editor/DetailsExtension.test.ts` asserted the old content model and constructed the extension without the summary/content node companions now required by the actual editor schema.
+   - Fix: instantiate the full details schema in tests and assert the current `detailsSummary detailsContent` structure.
+
+3. **Mock/runtime contract mismatch**
+   - `web/src/hooks/useSessionTimeout.test.ts` mocked `fetch` responses as plain objects, but the production client now expects `Response`-like objects with JSON content-type semantics.
+   - Fix: replace brittle object stubs with consistent JSON `Response` doubles so retry, CSRF, and session-refresh paths exercise the real parsing branch.
+
+#### Verified reruns
+
+- `pnpm type-check`: pass on 2026-03-11
+- `pnpm --filter @ship/web test:coverage -- --reporter=dot`: pass on 2026-03-11
+  - 19/19 files passed
+  - 156/156 tests passed
+  - Coverage: 33.93% lines, 22.97% branches, 33.03% statements, 31.06% functions
+- `pnpm exec playwright test e2e/collaboration-convergence.spec.ts e2e/offline-replay-exactly-once.spec.ts e2e/rbac-revocation-collaboration.spec.ts --list`: pass on 2026-03-11
+  - Confirms the 3 new critical-flow specs are registered and loadable
+
+#### High-risk E2E updates landed
+
+- Added reusable observable-state helpers in `e2e/fixtures/test-helpers.ts` for editor readiness, convergence, saved-state waits, and cursor-safe text reads.
+- Removed `waitForTimeout` usage from the scoped high-risk files touched in this remediation:
+  - `e2e/autosave-race-conditions.spec.ts`
+  - `e2e/race-conditions.spec.ts`
+  - `e2e/security.spec.ts`
+- Added the 3 missing critical-flow specs:
+  - `e2e/collaboration-convergence.spec.ts`
+  - `e2e/offline-replay-exactly-once.spec.ts`
+  - `e2e/rbac-revocation-collaboration.spec.ts`
+- Added collaboration-session disconnect handling on workspace membership removal so active revoked collaborators are forced out of the editing session.
+
+### 11. 2026-03-12 Layer 2 Grouped E2E Execution Update
+
+#### Grouped runner results
+
+- Group 1 accessibility/error/performance slice:
+  - Initial result: `127 passed`, `1 flaky`
+  - Flake: `e2e/tooltips.spec.ts` -> `command palette close button shows tooltip on hover`
+  - Follow-up: isolated rerun passed at `4 passed`
+- Group 2 auth/security slice:
+  - Result: `120 passed`
+- Group 3 workspace/admin slice:
+  - Result: `44 passed`
+- Group 4 mentions/comments/uploads/images slice:
+  - Result: `44 passed`
+- Group 5 documents/workflows slice:
+  - Result: `20 passed`, `2 skipped`
+  - The 2 skips are the known intentional `fixme` cases in `e2e/data-integrity.spec.ts`
+- Group 6 collaboration/offline/RBAC slice:
+  - Initial result: `2 failed`, `1 passed`
+  - Follow-up: rerun passed at `3 passed` after deterministic editor-authoring helper hardening in `e2e/fixtures/test-helpers.ts`
+- Group 7 editor-structure/rendering slice:
+  - Result: `75 passed`
+- Group 8 autosave/runtime-resilience/race slice:
+  - Initial result: `18 passed`, `1 flaky`
+  - Flake: `e2e/race-conditions.spec.ts` -> `offline edits queue and sync when back online`
+  - Follow-up: isolated rerun passed at `1 passed`, full grouped rerun passed at `19 passed`
+
+#### Documented old-test changes
+
+- Two pre-March 9, 2026 tests were changed after evaluating their contracts, with rationale recorded in `ERROR_ANALYSIS.md`:
+  - `e2e/tooltips.spec.ts`
+  - `e2e/race-conditions.spec.ts`
+- Both were test-only stability changes. No product behavior was changed to satisfy the old assertions.
+
+### 12. Improvement Plan
+
+- **Coverage unlock:** Keep runnable coverage active in `api` and `web`; improve line/branch baselines over time.
+- **Reliability:** Resolve 13 deterministic Web unit test failures; replace `waitForTimeout` in high-risk E2E specs with event/assertion-based waits; track flaky rate.
+- **Flow coverage:** Add 3 E2E scenarios—concurrent same-document overlap edit convergence, offline edit replay exactly-once, RBAC revocation during active collaboration.
+- **Reporting:** Re-run audit after fixes and update coverage percentages and Pass/Fail/Flaky baselines.
 
 ---
 
@@ -696,7 +785,7 @@ Flaky tests observed in this command path: **0**.
 | 6    | P2       | Initial collaboration version mismatch on open       | User-observed shared document versions differed on first open, then converged after navigating out of the doc and back in                   | Users can see stale/conflicting state at entry and may lose trust in real-time accuracy until manual re-entry                                 |
 | 7    | P2       | Reviews button fails with `403 Forbidden`            | User-observed click on Reviews leads to `403 Forbidden` response                                                                            | Users cannot access review flow and may interpret this as a broken feature rather than a permission/state issue                               |
 
-### 5. Top 3 Fixes
+### 5. Top 3 Fixes (Detailed)
 
 #### Gap 1: Concurrent title collision divergence
 
@@ -759,6 +848,12 @@ Flaky tests observed in this command path: **0**.
   - User-facing confusion/data-loss scenario: addressed.
   - Explicit measurement path: addressed.
   - Per-gap screenshot/recording evidence for top 3 gaps: complete
+
+### 9. Improvement Plan (Top 3 Fixes)
+
+1. **Gap 1 – Concurrent title collision divergence:** Add versioned compare-and-swap on title patch (`expectedUpdatedAt` guard in SQL `WHERE` clause); stale writes return `409 WRITE_CONFLICT`; client prompts refresh/merge.
+2. **Gap 2 – Reconnect redirect storm:** Add circuit-breaker style `401` deferral window in `web/src/lib/api.ts`; apply short reconnect grace window and retry gate before forced session-expired redirect.
+3. **Gap 3 – Autosave failure visibility:** Add `onFailure` callback and exponential backoff handling in `useAutoSave`; show sticky error banner/toast on terminal failure; clear only after successful save.
 
 ---
 
@@ -865,3 +960,12 @@ Flaky tests observed in this command path: **0**.
 - Baseline audit deliverable table: **Addressed** (`## 3`).
 - Improvement plan and target-achievement path: **Addressed** (`## 5`, `## 6`).
 - Before/after evidence for selected target: **Addressed** (`## 5` + evidence bundles).
+
+### 8. Improvement Plan
+
+- **Achieved:** Critical/Serious issues fixed on `/dashboard`, `/my-week`, `/issues` (Lighthouse 100, 0 violations).
+- **Remaining:**
+  1. Resolve 3 Serious contrast issues on `/projects`, `/programs`, `/team/allocation` (exit: app-wide Serious = 0).
+  2. Fix keyboard traversal for table content (exit: keyboard completeness = Full).
+  3. Complete manual screen-reader pass; fix `/issues` table row/cell announcement gap.
+  4. Add CI regression gates for Lighthouse + axe on core routes.

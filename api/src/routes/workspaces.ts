@@ -808,7 +808,7 @@ router.post('/:id/invites', authMiddleware, workspaceAdminMiddleware, async (req
         await pool.query(
           `UPDATE documents
            SET title = $1,
-               properties = jsonb_build_object('user_id', $2::text, 'email', $3)
+               properties = jsonb_build_object('user_id', $2::text, 'email', $3::text)
            WHERE id = $4`,
           [existingUser.name, existingUser.id, existingUser.email, existingPendingPerson.rows[0].id]
         );

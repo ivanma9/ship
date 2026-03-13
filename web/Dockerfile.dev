@@ -1,4 +1,6 @@
 # Development Dockerfile for Ship Web frontend
+# Run via: docker compose -f docker-compose.local.yml up
+# Context must be repo root: docker build -f web/Dockerfile.dev .
 FROM node:20-slim
 
 WORKDIR /app

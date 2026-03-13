@@ -9,6 +9,7 @@ import { useAssignableMembersQuery } from '@/hooks/useTeamMembersQuery';
 import { PersonCombobox, type Person } from '@/components/PersonCombobox';
 import { PropertyRow } from '@/components/ui/PropertyRow';
 import { apiGet, apiPatch, apiDelete } from '@/lib/api';
+import { createRequestError, type RequestError } from '@/lib/http-error';
 
 interface PersonDocument {
   id: string;
@@ -16,6 +17,7 @@ interface PersonDocument {
   content: unknown;
   document_type: string;
   archived_at: string | null;
+  updated_at?: string;
   properties?: {
     email?: string | null;
     role?: string | null;
@@ -51,6 +53,13 @@ export function PersonEditorPage() {
   const { data: teamMembers } = useAssignableMembersQuery();
   const [person, setPerson] = useState<PersonDocument | null>(null);
   const [loading, setLoading] = useState(true);
+  const [titleSaveError, setTitleSaveError] = useState<string | null>(null);
+  const [titleConflict, setTitleConflict] = useState<{
+    currentTitle: string;
+    currentUpdatedAt: string;
+  } | null>(null);
+  const expectedUpdatedAtRef = React.useRef<string | undefined>(undefined);
+  const latestLocalTitleRef = React.useRef('Untitled');
 
   // Create sub-document (for slash commands) - creates a wiki doc linked to this person
   const handleCreateSubDocument = useCallback(async () => {
@@ -78,6 +87,8 @@ export function PersonEditorPage() {
           const data = await response.json();
           if (data.document_type === 'person') {
             setPerson(data);
+            expectedUpdatedAtRef.current = data.updated_at;
+            latestLocalTitleRef.current = data.title;
           } else {
             // Not a person document, redirect to directory
             navigate('/team/directory');
@@ -121,9 +132,73 @@ export function PersonEditorPage() {
     onSave: async (newTitle: string) => {
       if (!id) return;
       const title = newTitle || 'Untitled';
-      await apiPatch(`/api/documents/${id}`, { title });
+      latestLocalTitleRef.current = title;
+      const response = await apiPatch(`/api/documents/${id}`, {
+        title,
+        expected_updated_at: expectedUpdatedAtRef.current,
+      });
+      if (!response.ok) {
+        throw await createRequestError(response, 'Failed to update person title');
+      }
+
+      const updatedPerson = await response.json() as PersonDocument;
+      expectedUpdatedAtRef.current = updatedPerson.updated_at;
+      setPerson(prev => prev ? { ...prev, title: updatedPerson.title, updated_at: updatedPerson.updated_at } : updatedPerson);
+    },
+    onSuccess: (savedTitle) => {
+      latestLocalTitleRef.current = savedTitle || 'Untitled';
+      setTitleSaveError(null);
+      setTitleConflict(null);
+    },
+    onFailure: (error) => {
+      const requestError = error as RequestError | undefined;
+      if (requestError?.status === 409 && requestError.currentTitle && requestError.currentUpdatedAt) {
+        expectedUpdatedAtRef.current = requestError.currentUpdatedAt;
+        setTitleConflict({
+          currentTitle: requestError.currentTitle,
+          currentUpdatedAt: requestError.currentUpdatedAt,
+        });
+        setPerson(prev => prev ? {
+          ...prev,
+          title: requestError.currentTitle || prev.title,
+          updated_at: requestError.currentUpdatedAt || prev.updated_at,
+        } : prev);
+      }
+      setTitleSaveError(
+        requestError?.status === 409
+          ? `Title changed elsewhere. Latest title: "${requestError.currentTitle}". Review and retry your title.`
+          : 'Title could not be saved. Changes are local only until save succeeds.'
+      );
     },
   });
+
+  const handleTitleChange = useCallback((title: string) => {
+    latestLocalTitleRef.current = title;
+    throttledTitleSave(title);
+  }, [throttledTitleSave]);
+
+  const handleTitleBlur = useCallback((title: string) => {
+    latestLocalTitleRef.current = title || 'Untitled';
+    void throttledTitleSave.flush(title);
+  }, [throttledTitleSave]);
+
+  const handleRetryTitleSave = useCallback(async () => {
+    if (!id || !titleConflict) return;
+
+    const response = await apiPatch(`/api/documents/${id}`, {
+      title: latestLocalTitleRef.current || 'Untitled',
+      expected_updated_at: titleConflict.currentUpdatedAt,
+    });
+    if (!response.ok) {
+      throw await createRequestError(response, 'Failed to retry person title save');
+    }
+
+    const updatedPerson = await response.json() as PersonDocument;
+    expectedUpdatedAtRef.current = updatedPerson.updated_at;
+    setPerson(prev => prev ? { ...prev, title: updatedPerson.title, updated_at: updatedPerson.updated_at } : updatedPerson);
+    setTitleSaveError(null);
+    setTitleConflict(null);
+  }, [id, titleConflict]);
 
   const handleDelete = useCallback(async () => {
     if (!id || !confirm('Delete this person? This cannot be undone.')) return;
@@ -155,7 +230,8 @@ export function PersonEditorPage() {
       documentId={id}
       userName={user?.name || 'Anonymous'}
       initialTitle={person.title}
-      onTitleChange={throttledTitleSave}
+      onTitleChange={handleTitleChange}
+      onTitleBlur={handleTitleBlur}
       onBack={() => navigate('/team/directory')}
       backLabel="Team Directory"
       roomPrefix="person"
@@ -163,6 +239,30 @@ export function PersonEditorPage() {
       onDelete={handleDelete}
       onCreateSubDocument={handleCreateSubDocument}
       onNavigateToDocument={handleNavigateToDocument}
+      contentBanner={titleSaveError ? (
+        <div
+          role="alert"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-300"
+        >
+          <div className="space-y-2">
+            <p>{titleSaveError}</p>
+            {titleConflict ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-amber-200/80">
+                  Server title: "{titleConflict.currentTitle}"
+                </span>
+                <button
+                  type="button"
+                  onClick={() => { void handleRetryTitleSave(); }}
+                  className="rounded border border-amber-300/40 px-2 py-1 text-xs font-medium text-amber-100 hover:bg-amber-500/10"
+                >
+                  Retry my title
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : undefined}
       sidebar={
         <PersonSidebar
           person={person}

@@ -282,6 +282,11 @@ function extractPlanItems(content: unknown): PlanItem[] {
   if (!Array.isArray(doc.content)) return [];
 
   const items: PlanItem[] = [];
+  const templateHeadings = new Set([
+    'What I plan to accomplish this week',
+    'What I delivered this week',
+    'Unplanned work',
+  ]);
 
   function walkNodes(nodes: unknown[]) {
     for (const node of nodes) {
@@ -296,6 +301,11 @@ function extractPlanItems(content: unknown): PlanItem[] {
       } else if (n.type === 'listItem') {
         const text = extractText(n).trim();
         if (text) {
+          items.push({ text, checked: false });
+        }
+      } else if (n.type === 'paragraph') {
+        const text = extractText(n).trim();
+        if (text && !templateHeadings.has(text)) {
           items.push({ text, checked: false });
         }
       } else if (Array.isArray(n.content)) {

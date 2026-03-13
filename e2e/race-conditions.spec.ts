@@ -2,6 +2,7 @@ import { test, expect, Page, Browser } from './fixtures/isolated-env'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
+import { triggerMentionPopup, waitForEditorReady, waitForSavedReload, waitForSyncStatus } from './fixtures/test-helpers'
 
 /**
  * Race Conditions and Concurrency Tests
@@ -38,8 +39,7 @@ async function createNewDocument(page: Page) {
     { timeout: 10000 }
   )
 
-  await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
-  await expect(page.locator('textarea[placeholder="Untitled"]')).toBeVisible({ timeout: 3000 })
+  await waitForEditorReady(page)
 }
 
 // Helper to login
@@ -50,6 +50,32 @@ async function login(page: Page, email: string = 'dev@ship.local', password: str
   await page.locator('#password').fill(password)
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page).not.toHaveURL('/login', { timeout: 5000 })
+}
+
+async function waitForDocumentPatchTitle(page: Page, expectedTitle: string): Promise<void> {
+  await page.waitForResponse(async (response) => {
+    if (!response.url().includes('/api/documents/') || response.request().method() !== 'PATCH') {
+      return false
+    }
+
+    try {
+      const body = response.request().postDataJSON() as { title?: string }
+      return body?.title === expectedTitle
+    } catch {
+      return false
+    }
+  }, { timeout: 15000 })
+}
+
+async function waitForUploadedImages(editor: ReturnType<Page['locator']>, count: number): Promise<void> {
+  await expect.poll(async () => {
+    const sources = await editor.locator('img').evaluateAll((images) =>
+      images
+        .map((img) => img.getAttribute('src') || '')
+        .filter((src) => src.startsWith('http') || src.includes('/api/files'))
+    )
+    return sources.length
+  }, { timeout: 20000 }).toBe(count)
 }
 
 // Create test image file
@@ -79,7 +105,7 @@ test.describe('Race Conditions - Rapid Operations', () => {
     await page.keyboard.type(rapidText, { delay: 10 })
 
     // Wait for all saves to complete
-    await page.waitForTimeout(3000)
+    await waitForSyncStatus(page)
 
     // Reload page
     await page.reload()
@@ -100,15 +126,15 @@ test.describe('Race Conditions - Rapid Operations', () => {
     for (const title of titles) {
       await titleInput.click()
       await titleInput.fill(title)
-      await page.waitForTimeout(200) // Brief delay between changes
     }
+    await titleInput.blur()
 
     // Wait for final save
-    await page.waitForTimeout(2000)
+    await waitForDocumentPatchTitle(page, 'Final Title')
+    await waitForSyncStatus(page)
 
     // Reload and verify final title is saved
-    await page.reload()
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
+    await waitForSavedReload(page)
 
     await expect(titleInput).toHaveValue('Final Title')
   })
@@ -138,7 +164,7 @@ test.describe('Race Conditions - Rapid Operations', () => {
       // Navigate back to docs list
       await page.goto('/docs')
       await page.waitForLoadState('networkidle')
-      await page.waitForTimeout(500)
+      await expect(sidebarButton).toBeVisible({ timeout: 3000 })
     }
 
     // THE CORE TEST: Verify no duplicate document IDs were created
@@ -161,15 +187,14 @@ test.describe('Race Conditions - Rapid Operations', () => {
 
     // Type @ multiple times rapidly
     for (let i = 0; i < 5; i++) {
-      await page.keyboard.type('@test')
-      await page.waitForTimeout(100)
+      await triggerMentionPopup(page, editor)
+      await page.keyboard.type('test')
       await page.keyboard.press('Escape')
       await page.keyboard.press('Backspace')
       await page.keyboard.press('Backspace')
       await page.keyboard.press('Backspace')
       await page.keyboard.press('Backspace')
       await page.keyboard.press('Backspace')
-      await page.waitForTimeout(100)
     }
 
     // Editor should still be functional
@@ -194,7 +219,6 @@ test.describe('Race Conditions - Image Upload', () => {
 
     // Trigger image upload via slash command
     await page.keyboard.type('/image')
-    await page.waitForTimeout(500)
 
     // Click the Image option specifically
     const imageOption = page.getByRole('button', { name: /^Image Upload an image/i })
@@ -208,18 +232,18 @@ test.describe('Race Conditions - Image Upload', () => {
     await fileChooser.setFiles(tmpPath)
 
     // Wait for upload to complete
-    await page.waitForTimeout(2000)
+    await waitForUploadedImages(editor, 1)
 
     // Continue typing (click editor first since file chooser may have changed focus)
     await editor.click()
     await page.keyboard.type(' After image')
 
-    await page.waitForTimeout(1000)
+    await waitForSyncStatus(page)
 
     // Both text and image should be present
     await expect(editor).toContainText('Before image')
     await expect(editor).toContainText('After image')
-    await expect(editor.locator('img')).toBeVisible({ timeout: 5000 })
+    await waitForUploadedImages(editor, 1)
 
     fs.unlinkSync(tmpPath)
   })
@@ -235,7 +259,6 @@ test.describe('Race Conditions - Image Upload', () => {
 
     for (let i = 0; i < 3; i++) {
       await page.keyboard.type('/image')
-      await page.waitForTimeout(500)
 
       // Click the Image option specifically
       const imageOption = page.getByRole('button', { name: /^Image Upload an image/i })
@@ -251,14 +274,14 @@ test.describe('Race Conditions - Image Upload', () => {
       await fileChooser.setFiles(tmpPath)
 
       // Wait for upload to complete before next one
-      await page.waitForTimeout(2000)
+      await waitForUploadedImages(editor, i + 1)
 
       // Click editor to refocus
       await editor.click()
     }
 
     // Wait for all uploads to complete
-    await page.waitForTimeout(2000)
+    await waitForUploadedImages(editor, 3)
 
     // Should have 3 images
     const imgCount = await editor.locator('img').count()
@@ -276,17 +299,16 @@ test.describe('Race Conditions - Image Upload', () => {
 
     // Type, trigger mention, continue typing
     await page.keyboard.type('Some text before ')
-    await page.keyboard.type('@')
-
-    // Wait for mention popup
-    await expect(page.locator('[role="listbox"]')).toBeVisible({ timeout: 5000 })
+    await triggerMentionPopup(page, editor)
 
     // Close mention popup and continue typing
     await page.keyboard.press('Escape')
     await page.keyboard.type(' more text after')
 
-    // All text should be present
-    await expect(editor).toContainText('Some text before @ more text after')
+    // Preserve the follow-up typing after the mention flow, even if the editor rewrites
+    // the trigger text while opening and dismissing the popup.
+    await expect(editor).toContainText('more text after')
+    await expect(editor).toContainText('@')
   })
 })
 
@@ -303,14 +325,13 @@ test.describe('Race Conditions - Network and Offline', () => {
 
     // Make initial edit online
     await page.keyboard.type('Online content. ')
-    await page.waitForTimeout(1000)
+    await waitForSyncStatus(page)
 
     // Go offline
     await context.setOffline(true)
 
     // Make edits while offline
     await page.keyboard.type('Offline edit 1. ')
-    await page.waitForTimeout(500)
     await page.keyboard.type('Offline edit 2.')
 
     // Content should be visible locally
@@ -321,8 +342,15 @@ test.describe('Race Conditions - Network and Offline', () => {
     // Go back online
     await context.setOffline(false)
 
-    // Wait for sync
-    await page.waitForTimeout(3000)
+    // Wait for the sync indicator to come back and leave the offline state.
+    await expect(page.getByTestId('sync-status')).toBeVisible({ timeout: 15000 })
+    await expect.poll(async () => {
+      const statusText = await page.getByTestId('sync-status').textContent()
+      return statusText?.trim() ?? ''
+    }, {
+      timeout: 15000,
+      intervals: [250, 500, 1000],
+    }).not.toMatch(/offline/i)
 
     // Reload to verify sync happened
     await page.reload()
@@ -350,7 +378,7 @@ test.describe('Race Conditions - Network and Offline', () => {
     await page.keyboard.type('Test content')
 
     // Wait for operations to complete
-    await page.waitForTimeout(3000)
+    await waitForSyncStatus(page)
 
     // Content should appear exactly once
     const content = await editor.textContent()

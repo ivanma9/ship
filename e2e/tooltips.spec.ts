@@ -9,6 +9,25 @@ async function login(page: import('@playwright/test').Page) {
   await expect(page).not.toHaveURL('/login', { timeout: 5000 })
 }
 
+async function openCommandPalette(page: import('@playwright/test').Page) {
+  const dialog = page.getByRole('dialog', { name: 'Command palette' })
+  const appShell = page.getByRole('navigation', { name: 'Primary navigation' })
+
+  await expect(appShell).toBeVisible()
+  await page.locator('body').click()
+  await page.keyboard.press('Meta+k')
+
+  try {
+    await expect(dialog).toBeVisible({ timeout: 3000 })
+  } catch {
+    await page.locator('body').click()
+    await page.keyboard.press('Meta+k')
+    await expect(dialog).toBeVisible({ timeout: 3000 })
+  }
+
+  return dialog
+}
+
 test.describe('Icon Tooltips', () => {
   test('rail icons show tooltips on hover', async ({ page }) => {
     await login(page)
@@ -88,13 +107,10 @@ test.describe('Icon Tooltips', () => {
     await page.waitForLoadState('networkidle')
 
     // Open command palette with keyboard shortcut
-    await page.keyboard.press('Meta+k')
-
-    // Wait for command palette to appear
-    await page.waitForSelector('[role="dialog"][aria-label="Command palette"]', { timeout: 3000 })
+    const dialog = await openCommandPalette(page)
 
     // Find and hover over close button
-    const closeButton = page.locator('[role="dialog"][aria-label="Command palette"] button[aria-label="Close dialog"]')
+    const closeButton = dialog.getByRole('button', { name: 'Close dialog' })
     await expect(closeButton).toBeVisible()
     await closeButton.hover()
 

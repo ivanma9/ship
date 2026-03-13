@@ -26,6 +26,8 @@ interface ProgressEntry {
   ts: number;
   duration?: number;
   error?: string;
+  retry?: number;
+  flaky?: boolean;
 }
 
 const RESULTS_DIR = 'test-results';
@@ -67,7 +69,10 @@ class ProgressReporter implements Reporter {
           passed: 0,
           failed: 0,
           skipped: 0,
+          flaky: 0,
+          retried: 0,
           pending: this.totalTests,
+          startedAt: Date.now(),
           ts: Date.now(),
         }, null, 2)
       );
@@ -93,6 +98,8 @@ class ProgressReporter implements Reporter {
       status,
       ts: Date.now(),
       duration: result.duration,
+      retry: result.retry,
+      flaky: result.retry > 0 && status === 'passed',
     };
 
     // For failures, write error to separate file
@@ -104,10 +111,21 @@ class ProgressReporter implements Reporter {
     this.writeProgress(entry);
 
     // Atomically update summary counters (read-modify-write)
-    this.updateSummaryCounter(status);
+    this.updateSummaryCounter(status, result.retry);
   }
 
   onEnd(result: FullResult): void {
+    try {
+      const data = fs.readFileSync(SUMMARY_FILE, 'utf-8');
+      const summary = JSON.parse(data);
+      summary.finishedAt = Date.now();
+      summary.finalStatus = result.status;
+      summary.ts = Date.now();
+      fs.writeFileSync(SUMMARY_FILE, JSON.stringify(summary, null, 2));
+    } catch {
+      // Ignore summary finalization errors.
+    }
+
     // Write final summary
     this.writeProgress({
       test: '__summary__',
@@ -117,7 +135,7 @@ class ProgressReporter implements Reporter {
     });
   }
 
-  private updateSummaryCounter(status: 'passed' | 'failed' | 'skipped'): void {
+  private updateSummaryCounter(status: 'passed' | 'failed' | 'skipped', retry: number): void {
     try {
       const data = fs.readFileSync(SUMMARY_FILE, 'utf-8');
       const summary = JSON.parse(data);
@@ -125,6 +143,12 @@ class ProgressReporter implements Reporter {
       if (status === 'passed') summary.passed++;
       else if (status === 'failed') summary.failed++;
       else if (status === 'skipped') summary.skipped++;
+      if (retry > 0) {
+        summary.retried += 1;
+        if (status === 'passed') {
+          summary.flaky += 1;
+        }
+      }
 
       summary.pending = summary.total - summary.passed - summary.failed - summary.skipped;
       summary.ts = Date.now();

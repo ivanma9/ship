@@ -3,7 +3,7 @@
 # Watch test progress in real-time
 #
 # Reads test-results/summary.json and displays:
-#   Passed: 45 | Failed: 3 | Pending: 72 | Last: 2s ago
+#   Passed: 45 | Failed: 3 | Flaky: 2 | Pending: 72 | Last: 2s ago
 #
 # Usage:
 #   ./scripts/watch-tests.sh           # Watch until all tests complete
@@ -30,6 +30,8 @@ show_status() {
     local passed=$(jq -r '.passed // 0' "$SUMMARY_FILE" 2>/dev/null || echo 0)
     local failed=$(jq -r '.failed // 0' "$SUMMARY_FILE" 2>/dev/null || echo 0)
     local skipped=$(jq -r '.skipped // 0' "$SUMMARY_FILE" 2>/dev/null || echo 0)
+    local flaky=$(jq -r '.flaky // 0' "$SUMMARY_FILE" 2>/dev/null || echo 0)
+    local retried=$(jq -r '.retried // 0' "$SUMMARY_FILE" 2>/dev/null || echo 0)
     local pending=$(jq -r '.pending // 0' "$SUMMARY_FILE" 2>/dev/null || echo 0)
     local ts_ms=$(jq -r '.ts // 0' "$SUMMARY_FILE" 2>/dev/null || echo 0)
 
@@ -54,7 +56,14 @@ show_status() {
         status_line="${status_line} | Pending: ${pending}"
     fi
 
+    if [ "$flaky" -gt 0 ]; then
+        status_line="${status_line} | ${YELLOW}Flaky: ${flaky}${NC}"
+    else
+        status_line="${status_line} | Flaky: ${flaky}"
+    fi
+
     status_line="${status_line} | ${BLUE}Total: ${total}${NC}"
+    status_line="${status_line} | Retries: ${retried}"
     status_line="${status_line} | Last update: ${diff_s}s ago"
 
     echo -e "$status_line"

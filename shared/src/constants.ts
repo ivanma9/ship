@@ -20,6 +20,8 @@ export const ERROR_CODES = {
   INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
   SESSION_EXPIRED: 'SESSION_EXPIRED',
   ALREADY_EXISTS: 'ALREADY_EXISTS',
+  RATE_LIMITED: 'RATE_LIMITED',
+  WRITE_CONFLICT: 'WRITE_CONFLICT',
 } as const;
 
 // Session timeout in milliseconds (15 minutes idle timeout)

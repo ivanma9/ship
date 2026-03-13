@@ -62,7 +62,7 @@ interface AuthContextType {
   loading: boolean;
   isSuperAdmin: boolean;
   impersonating: { userId: string; userName: string } | null;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; code?: string }>;
   logout: () => Promise<void>;
   endImpersonation: () => Promise<void>;
 }
@@ -150,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {
       success: false,
       error: response.error?.message || 'Login failed',
+      code: response.error?.code,
     };
   }, [setCurrentWorkspace, setWorkspaces]);
 

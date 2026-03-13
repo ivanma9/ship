@@ -4,7 +4,115 @@
  * These helpers encapsulate retry logic for common interactions that
  * fail under parallel test load due to timing issues.
  */
-import { expect, type Page, type Locator } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
+
+const DEFAULT_SYNC_STATUS = /Saved|Cached/;
+
+export async function waitForEditorReady(page: Page): Promise<void> {
+  await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('textarea[placeholder="Untitled"]')).toBeVisible({ timeout: 5000 });
+}
+
+export async function waitForSyncStatus(
+  page: Page,
+  status: RegExp = DEFAULT_SYNC_STATUS,
+): Promise<void> {
+  await expect(page.getByTestId('sync-status').getByText(status)).toBeVisible({ timeout: 15000 });
+}
+
+export async function waitForOfflineState(page: Page): Promise<void> {
+  await expect(page.getByTestId('sync-status')).toContainText(/offline/i, { timeout: 15000 });
+}
+
+export async function waitForSyncRecovered(page: Page): Promise<void> {
+  await expect(page.getByTestId('sync-status')).toBeVisible({ timeout: 15000 });
+  await expect.poll(async () => {
+    const statusText = await page.getByTestId('sync-status').textContent();
+    return statusText?.trim() ?? '';
+  }, {
+    timeout: 15000,
+    intervals: [250, 500, 1000],
+  }).not.toMatch(/offline/i);
+}
+
+export async function waitForUrlChangeAway(page: Page, previousUrl: string): Promise<void> {
+  await expect.poll(() => page.url(), {
+    timeout: 15000,
+    intervals: [250, 500, 1000],
+  }).not.toBe(previousUrl);
+}
+
+export async function waitForCollaborationWebSocket(_page: Page, urls: string[]): Promise<void> {
+  await expect.poll(() => {
+    return urls.some((url) => url.includes('/collaboration/'));
+  }, {
+    timeout: 10000,
+    intervals: [100, 250, 500, 1000],
+  }).toBe(true);
+}
+
+export async function waitForSavedReload(page: Page): Promise<void> {
+  await page.reload();
+  await waitForEditorReady(page);
+  await waitForSyncStatus(page);
+}
+
+export async function getEditorTextWithoutCursor(page: Page): Promise<string> {
+  const editor = page.locator('.ProseMirror').first();
+  return editor.evaluate((node) => {
+    const clone = node.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('.collaboration-cursor__label, .collaboration-cursor__caret').forEach((el) => el.remove());
+    return clone.textContent ?? '';
+  });
+}
+
+export async function waitForEditorText(page: Page, text: string | RegExp): Promise<void> {
+  if (typeof text === 'string') {
+    await expect.poll(async () => getEditorTextWithoutCursor(page), {
+      timeout: 15000,
+    }).toContain(text);
+    return;
+  }
+
+  await expect.poll(async () => getEditorTextWithoutCursor(page), {
+    timeout: 15000,
+  }).toMatch(text);
+}
+
+export async function typeInEditorWithRetry(page: Page, text: string): Promise<void> {
+  const editor = page.locator('.ProseMirror').first();
+
+  await expect(async () => {
+    await editor.click({ position: { x: 12, y: 12 } });
+    await expect(editor).toBeFocused({ timeout: 3000 });
+    await editor.pressSequentially(text);
+    await waitForEditorText(page, text);
+  }).toPass({ timeout: 30000, intervals: [1000, 2000, 3000, 5000] });
+}
+
+export async function waitForConvergedEditors(
+  pages: Page[],
+  assertion: (text: string) => void,
+): Promise<string> {
+  let finalText = '';
+
+  await expect.poll(async () => {
+    const texts = await Promise.all(pages.map((page) => getEditorTextWithoutCursor(page)));
+    const normalized = texts.map((text) => text.replace(/\s+/g, ' ').trim());
+    const first = normalized[0] ?? '';
+    if (!normalized.every((text) => text === first)) {
+      return '__not_converged__';
+    }
+    finalText = first;
+    assertion(first);
+    return first;
+  }, {
+    timeout: 20000,
+    intervals: [250, 500, 1000],
+  }).not.toBe('__not_converged__');
+
+  return finalText;
+}
 
 /**
  * Trigger the TipTap mention autocomplete popup by typing '@' in the editor.
@@ -31,13 +139,27 @@ export async function triggerMentionPopup(page: Page, editor: Locator): Promise<
   await expect(async () => {
     await editor.click();
     await expect(editor).toBeFocused({ timeout: 3000 });
-    await page.keyboard.press('Home');
-    await page.keyboard.press('Shift+End');
-    await page.keyboard.press('Delete');
-    await page.waitForTimeout(300);
+    await page.keyboard.press('Tab').catch(() => {});
+    await editor.click();
+    await expect(editor).toBeFocused({ timeout: 3000 });
+    await page.keyboard.press('Meta+End').catch(() => {});
+    await page.keyboard.press('Control+End').catch(() => {});
+    await page.keyboard.press('ArrowRight').catch(() => {});
     await page.keyboard.type('@');
-    await expect(mentionPopup).toBeVisible({ timeout: 5000 });
+    const popupVisible = await expect
+      .poll(async () => mentionPopup.isVisible().catch(() => false), {
+        timeout: 3000,
+        intervals: [100, 250, 500],
+      })
+      .toBeTruthy()
+      .then(() => true)
+      .catch(() => false);
+    if (!popupVisible) {
+      await page.keyboard.press('Backspace');
+      throw new Error('Mention popup did not open');
+    }
   }).toPass({ timeout: 30000, intervals: [1000, 2000, 3000, 4000, 5000] });
+  await expect(mentionPopup).toBeVisible({ timeout: 5000 });
   return mentionPopup;
 }
 

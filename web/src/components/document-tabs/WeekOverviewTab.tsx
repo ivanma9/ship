@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useAssignableMembersQuery } from '@/hooks/useTeamMembersQuery';
 import { useActiveWeeksQuery } from '@/hooks/useWeeksQuery';
 import { apiPatch, apiDelete } from '@/lib/api';
+import { createRequestError } from '@/lib/http-error';
 import type { DocumentTabProps } from '@/lib/document-tabs';
 
 /**
@@ -40,7 +41,7 @@ export default function SprintOverviewTab({ documentId, document }: DocumentTabP
     mutationFn: async (updates: Partial<UnifiedDocument>) => {
       const response = await apiPatch(`/api/documents/${documentId}`, updates);
       if (!response.ok) {
-        throw new Error('Failed to update document');
+        throw await createRequestError(response, 'Failed to update document');
       }
       return response.json();
     },
@@ -67,8 +68,8 @@ export default function SprintOverviewTab({ documentId, document }: DocumentTabP
         queryClient.setQueryData(['document', documentId], context.previousDocument);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['document', documentId] });
+    onSuccess: (updatedDocument) => {
+      queryClient.setQueryData(['document', documentId], updatedDocument);
       queryClient.invalidateQueries({ queryKey: ['sprints'] });
     },
   });
@@ -93,7 +94,7 @@ export default function SprintOverviewTab({ documentId, document }: DocumentTabP
 
   // Handle update
   const handleUpdate = useCallback(async (updates: Partial<UnifiedDocument>) => {
-    await updateMutation.mutateAsync(updates);
+    return updateMutation.mutateAsync(updates);
   }, [updateMutation]);
 
   // Handle delete

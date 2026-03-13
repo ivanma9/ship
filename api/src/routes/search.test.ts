@@ -16,6 +16,8 @@ describe('Search API', () => {
   let testUserId: string;
   let testPersonDocId: string;
   let testWikiDocId: string;
+  let limitPersonDocIds: string[] = [];
+  let limitDocumentIds: string[] = [];
 
   beforeAll(async () => {
     // Create test workspace
@@ -68,11 +70,49 @@ describe('Search API', () => {
       [testWorkspaceId]
     );
     testWikiDocId = wikiResult.rows[0].id;
+
+    const limitPeopleResult = await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, content)
+       SELECT $1, 'person', value, '{}'
+       FROM unnest($2::text[]) AS value
+       RETURNING id`,
+      [testWorkspaceId, [
+        'LimitSearch Person 1',
+        'LimitSearch Person 2',
+        'LimitSearch Person 3',
+        'LimitSearch Person 4',
+        'LimitSearch Person 5',
+        'LimitSearch Person 6',
+      ]]
+    );
+    limitPersonDocIds = limitPeopleResult.rows.map((row) => row.id);
+
+    const limitDocsResult = await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, content, updated_at, created_by)
+       VALUES
+         ($1, 'issue', 'LimitSearch Issue A', '{}', NOW() - interval '1 hour', $2),
+         ($1, 'issue', 'LimitSearch Issue B', '{}', NOW() - interval '2 hours', $2),
+         ($1, 'issue', 'LimitSearch Issue C', '{}', NOW() - interval '3 hours', $2),
+         ($1, 'wiki', 'LimitSearch Wiki A', '{}', NOW() - interval '4 hours', $2),
+         ($1, 'wiki', 'LimitSearch Wiki B', '{}', NOW() - interval '5 hours', $2),
+         ($1, 'wiki', 'LimitSearch Wiki C', '{}', NOW() - interval '6 hours', $2),
+         ($1, 'project', 'LimitSearch Project A', '{}', NOW() - interval '7 hours', $2),
+         ($1, 'project', 'LimitSearch Project B', '{}', NOW() - interval '8 hours', $2),
+         ($1, 'project', 'LimitSearch Project C', '{}', NOW() - interval '9 hours', $2),
+         ($1, 'program', 'LimitSearch Program A', '{}', NOW() - interval '10 hours', $2),
+         ($1, 'program', 'LimitSearch Program B', '{}', NOW() - interval '11 hours', $2)
+       RETURNING id`,
+      [testWorkspaceId, testUserId]
+    );
+    limitDocumentIds = limitDocsResult.rows.map((row) => row.id);
   });
 
   afterAll(async () => {
     // Clean up test data in correct order (foreign keys)
-    await pool.query('DELETE FROM documents WHERE id IN ($1, $2)', [testPersonDocId, testWikiDocId]);
+    await pool.query(
+      'DELETE FROM documents WHERE id = ANY($1::uuid[])',
+      [[testPersonDocId, testWikiDocId, ...limitPersonDocIds, ...limitDocumentIds]]
+    );
     await pool.query('DELETE FROM sessions WHERE user_id = $1', [testUserId]);
     await pool.query('DELETE FROM workspace_memberships WHERE user_id = $1', [testUserId]);
     await pool.query('DELETE FROM users WHERE id = $1', [testUserId]);
@@ -136,6 +176,49 @@ describe('Search API', () => {
     expect(doc).toHaveProperty('id');
     expect(doc).toHaveProperty('title');
     expect(doc).toHaveProperty('document_type');
+  });
+
+  it('GET /api/search/mentions returns people-only results when only people match', async () => {
+    const res = await request(app)
+      .get('/api/search/mentions?q=Person 1')
+      .set('Cookie', sessionCookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.people).toHaveLength(1);
+    expect(res.body.documents).toHaveLength(0);
+    expect(res.body.people[0].name).toBe('LimitSearch Person 1');
+  });
+
+  it('GET /api/search/mentions returns document-only results when only documents match', async () => {
+    const res = await request(app)
+      .get('/api/search/mentions?q=Program A')
+      .set('Cookie', sessionCookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.people).toHaveLength(0);
+    expect(res.body.documents).toHaveLength(1);
+    expect(res.body.documents[0].title).toBe('LimitSearch Program A');
+  });
+
+  it('GET /api/search/mentions preserves per-source limits independently', async () => {
+    const res = await request(app)
+      .get('/api/search/mentions?q=LimitSearch')
+      .set('Cookie', sessionCookie);
+
+    expect(res.status).toBe(200);
+    expect(res.body.people).toHaveLength(5);
+    expect(res.body.documents).toHaveLength(10);
+    expect(res.body.people.map((person: { name: string }) => person.name)).toEqual([
+      'LimitSearch Person 1',
+      'LimitSearch Person 2',
+      'LimitSearch Person 3',
+      'LimitSearch Person 4',
+      'LimitSearch Person 5',
+    ]);
+    expect(res.body.documents[0]).toMatchObject({
+      title: 'LimitSearch Issue A',
+      document_type: 'issue',
+    });
   });
 });
 

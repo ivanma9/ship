@@ -19,6 +19,41 @@ import { hasContent } from '../utils/document-content.js';
 import { getAllocations } from '../utils/allocation.js';
 import type { AccountabilityType } from '@ship/shared';
 
+type SprintProperties = {
+  sprint_number?: number;
+  status?: string;
+};
+
+type ActiveSprintRow = {
+  id: string;
+  title: string | null;
+  properties: SprintProperties | null;
+  issue_count: string;
+};
+
+type StandupStatusRow = {
+  sprint_id: string;
+  has_standup_today: boolean;
+  last_standup_date: Date | string | null;
+};
+
+type OwnedSprintRow = {
+  id: string;
+  title: string | null;
+  properties: SprintProperties | null;
+  project_id: string | null;
+};
+
+type SprintIssueCountRow = {
+  sprint_id: string;
+  issue_count: string;
+};
+
+type WeeklyDocRow = {
+  id: string;
+  content: unknown;
+};
+
 // Accountability item returned from check
 export interface MissingAccountabilityItem {
   type: AccountabilityType;
@@ -43,6 +78,18 @@ export interface AccountabilityIssue {
   type: AccountabilityType;
   targetId: string;
   dueDate: string | null;
+}
+
+function toUuidArray(ids: string[]): string[] {
+  return ids.length > 0 ? ids : [];
+}
+
+function toIsoDateString(value: string | Date): string {
+  if (value instanceof Date) {
+    return value.toISOString().split('T')[0] ?? '';
+  }
+
+  return value;
 }
 
 /**
@@ -171,32 +218,36 @@ async function checkMissingStandups(
     [workspaceId, userId, currentSprintNumber]
   );
 
-  // Check each sprint for missing standup today
-  for (const sprint of activeSprintsResult.rows) {
-    const standupResult = await pool.query(
-      `SELECT id FROM documents
+  const activeSprints = activeSprintsResult.rows as ActiveSprintRow[];
+  const sprintIds = activeSprints.map((sprint) => sprint.id);
+
+  const standupStatusMap = new Map<string, StandupStatusRow>();
+  if (sprintIds.length > 0) {
+    const standupStatusResult = await pool.query<StandupStatusRow>(
+      `SELECT
+         parent_id::text AS sprint_id,
+         BOOL_OR(created_at >= $3::date AND created_at < ($3::date + interval '1 day')) AS has_standup_today,
+         MAX(created_at::date) AS last_standup_date
+       FROM documents
        WHERE workspace_id = $1
          AND document_type = 'standup'
          AND (properties->>'author_id')::uuid = $2
-         AND parent_id = $3
-         AND created_at >= $4::date
-         AND created_at < ($4::date + interval '1 day')`,
-      [workspaceId, userId, sprint.id, todayStr]
+         AND parent_id = ANY($4::uuid[])
+       GROUP BY parent_id`,
+      [workspaceId, userId, todayStr, toUuidArray(sprintIds)]
     );
 
-    if (standupResult.rows.length === 0) {
-      // Calculate days since last standup
-      const lastStandupResult = await pool.query(
-        `SELECT MAX(created_at::date) as last_standup_date
-         FROM documents
-         WHERE workspace_id = $1
-           AND document_type = 'standup'
-           AND (properties->>'author_id')::uuid = $2
-           AND parent_id = $3`,
-        [workspaceId, userId, sprint.id]
-      );
+    for (const row of standupStatusResult.rows) {
+      standupStatusMap.set(row.sprint_id, row);
+    }
+  }
 
-      const lastStandupDate = lastStandupResult.rows[0]?.last_standup_date;
+  // Check each sprint for missing standup today
+  for (const sprint of activeSprints) {
+    const standupStatus = standupStatusMap.get(sprint.id);
+
+    if (!standupStatus?.has_standup_today) {
+      const lastStandupDate = standupStatus?.last_standup_date ?? null;
       let daysSinceLastStandup = 0;
       const sprintTitle = sprint.title || `Week ${sprint.properties?.sprint_number || 'N'}`;
       const issueCount = parseInt(sprint.issue_count, 10) || 0;
@@ -208,7 +259,7 @@ async function checkMissingStandups(
       }
 
       if (lastStandupDate) {
-        const lastDate = new Date(lastStandupDate);
+        const lastDate = new Date(toIsoDateString(lastStandupDate));
         const todayDate = new Date(todayStr);
         daysSinceLastStandup = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
         if (daysSinceLastStandup > 1) {
@@ -247,7 +298,7 @@ async function checkSprintAccountability(
 
   // Find sprints where user is owner (accountable) and sprint has started
   // Also get the project associated with each sprint (via document_associations)
-  const sprintsResult = await pool.query(
+  const sprintsResult = await pool.query<OwnedSprintRow>(
     `SELECT s.id, s.title, s.properties, da.related_id as project_id
      FROM documents s
      LEFT JOIN document_associations da ON da.document_id = s.id AND da.relationship_type = 'project'
@@ -259,7 +310,31 @@ async function checkSprintAccountability(
     [workspaceId, userId]
   );
 
-  for (const sprint of sprintsResult.rows) {
+  const sprints = sprintsResult.rows;
+  const sprintIds = sprints.map((sprint) => sprint.id);
+  const sprintIssueCountMap = new Map<string, number>();
+
+  if (sprintIds.length > 0) {
+    const sprintIssueCountResult = await pool.query<SprintIssueCountRow>(
+      `SELECT
+         da.related_id::text AS sprint_id,
+         COUNT(*)::text AS issue_count
+       FROM document_associations da
+       JOIN documents d ON d.id = da.document_id
+       WHERE da.related_id = ANY($1::uuid[])
+         AND da.relationship_type = 'sprint'
+         AND d.document_type = 'issue'
+         AND d.deleted_at IS NULL
+       GROUP BY da.related_id`,
+      [toUuidArray(sprintIds)]
+    );
+
+    for (const row of sprintIssueCountResult.rows) {
+      sprintIssueCountMap.set(row.sprint_id, parseInt(row.issue_count, 10) || 0);
+    }
+  }
+
+  for (const sprint of sprints) {
     const props = sprint.properties || {};
     const sprintNumber = props.sprint_number || 1;
     const projectId = sprint.project_id || null;
@@ -294,18 +369,7 @@ async function checkSprintAccountability(
     }
 
     // Check if sprint has no issues
-    const issueCountResult = await pool.query(
-      `SELECT COUNT(*) as count
-       FROM document_associations da
-       JOIN documents d ON d.id = da.document_id
-       WHERE da.related_id = $1
-         AND da.relationship_type = 'sprint'
-         AND d.document_type = 'issue'
-         AND d.deleted_at IS NULL`,
-      [sprint.id]
-    );
-
-    const issueCount = parseInt(issueCountResult.rows[0].count, 10);
+    const issueCount = sprintIssueCountMap.get(sprint.id) ?? 0;
     if (issueCount === 0) {
       items.push({
         type: 'week_issues',
@@ -371,6 +435,38 @@ async function checkWeeklyPersonAccountability(
   // but action items must check all allocations so nothing gets missed.
   const allocations = await getAllocations(workspaceId, personId, userId, sprintNumber);
 
+  let planDoc: WeeklyDocRow | null = null;
+  if (todayStr >= planDueStr) {
+    const planResult = await pool.query<WeeklyDocRow>(
+      `SELECT id, content FROM documents
+       WHERE workspace_id = $1
+         AND document_type = 'weekly_plan'
+         AND (properties->>'person_id') = $2
+         AND (properties->>'week_number')::int = $3
+         AND archived_at IS NULL
+         AND deleted_at IS NULL`,
+      [workspaceId, personId, sprintNumber]
+    );
+
+    planDoc = planResult.rows[0] ?? null;
+  }
+
+  let retroDoc: WeeklyDocRow | null = null;
+  if (todayStr >= retroActionableStr) {
+    const retroResult = await pool.query<WeeklyDocRow>(
+      `SELECT id, content FROM documents
+       WHERE workspace_id = $1
+         AND document_type = 'weekly_retro'
+         AND (properties->>'person_id') = $2
+         AND (properties->>'week_number')::int = $3
+         AND archived_at IS NULL
+         AND deleted_at IS NULL`,
+      [workspaceId, personId, sprintNumber]
+    );
+
+    retroDoc = retroResult.rows[0] ?? null;
+  }
+
   for (const allocation of allocations) {
     const projectId = allocation.projectId;
     const projectName = allocation.projectName;
@@ -378,18 +474,6 @@ async function checkWeeklyPersonAccountability(
     // Check for missing weekly_plan (due from Saturday before the week starts)
     // A plan counts as "done" only if it has meaningful content (not just template headings)
     if (todayStr >= planDueStr) {
-      const planResult = await pool.query(
-        `SELECT id, content FROM documents
-         WHERE workspace_id = $1
-           AND document_type = 'weekly_plan'
-           AND (properties->>'person_id') = $2
-           AND (properties->>'week_number')::int = $3
-           AND archived_at IS NULL
-           AND deleted_at IS NULL`,
-        [workspaceId, personId, sprintNumber]
-      );
-
-      const planDoc = planResult.rows[0];
       if (!planDoc || !hasContent(planDoc.content)) {
         items.push({
           type: 'weekly_plan',
@@ -408,18 +492,6 @@ async function checkWeeklyPersonAccountability(
     // Check for missing weekly_retro (due from Thursday of the sprint week)
     // A retro counts as "done" only if it has meaningful content (not just template headings)
     if (todayStr >= retroActionableStr) {
-      const retroResult = await pool.query(
-        `SELECT id, content FROM documents
-         WHERE workspace_id = $1
-           AND document_type = 'weekly_retro'
-           AND (properties->>'person_id') = $2
-           AND (properties->>'week_number')::int = $3
-           AND archived_at IS NULL
-           AND deleted_at IS NULL`,
-        [workspaceId, personId, sprintNumber]
-      );
-
-      const retroDoc = retroResult.rows[0];
       if (!retroDoc || !hasContent(retroDoc.content)) {
         items.push({
           type: 'weekly_retro',

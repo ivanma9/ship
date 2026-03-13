@@ -1,4 +1,5 @@
 import { test, expect, Page } from './fixtures/isolated-env';
+import { waitForEditorReady, waitForSyncStatus } from './fixtures/test-helpers';
 
 /**
  * Auto-Save Race Condition Tests
@@ -37,8 +38,7 @@ async function createNewDocument(page: Page) {
     { timeout: 10000 }
   );
 
-  await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 });
-  await expect(page.locator('textarea[placeholder="Untitled"]')).toBeVisible({ timeout: 3000 });
+  await waitForEditorReady(page);
 }
 
 // Helper to create a new issue
@@ -52,8 +52,31 @@ async function createNewIssue(page: Page) {
   await newIssueButton.click();
 
   await page.waitForURL(/\/documents\/[a-f0-9-]+/, { timeout: 10000 });
-  await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 });
-  await expect(page.locator('textarea[placeholder="Untitled"]')).toBeVisible({ timeout: 3000 });
+  await waitForEditorReady(page);
+}
+
+async function waitForNextDocumentPatch(page: Page): Promise<void> {
+  await page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/documents/')
+      && response.request().method() === 'PATCH',
+    { timeout: 15000 },
+  );
+}
+
+async function waitForDocumentPatchTitle(page: Page, expectedTitle: string): Promise<void> {
+  await page.waitForResponse(async (response) => {
+    if (!response.url().includes('/api/documents/') || response.request().method() !== 'PATCH') {
+      return false;
+    }
+
+    try {
+      const body = response.request().postDataJSON() as { title?: string };
+      return body?.title === expectedTitle;
+    } catch {
+      return false;
+    }
+  }, { timeout: 15000 });
 }
 
 test.describe('Auto-Save Race Conditions - Title Field', () => {
@@ -68,24 +91,23 @@ test.describe('Auto-Save Race Conditions - Title Field', () => {
 
     // Type first part of title
     await titleInput.click();
+    const firstPatch = waitForNextDocumentPatch(page);
     await titleInput.fill('Hello');
-
-    // Wait for debounce/throttle to trigger save (500ms + network time)
-    // This simulates the "pause to think" scenario
-    await page.waitForTimeout(800);
+    await firstPatch;
 
     // Continue typing while server response may be in-flight
+    const secondPatch = waitForNextDocumentPatch(page);
     await titleInput.fill('Hello World');
-
-    // Wait for any stale responses to arrive
-    await page.waitForTimeout(1500);
+    await titleInput.blur();
+    await secondPatch;
+    await waitForSyncStatus(page);
 
     // Title should be "Hello World", NOT reverted to "Hello"
     await expect(titleInput).toHaveValue('Hello World');
 
     // Reload to verify "Hello World" was actually saved
     await page.reload();
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 });
+    await waitForEditorReady(page);
     await expect(page.locator('textarea[placeholder="Untitled"]')).toHaveValue('Hello World');
   });
 
@@ -99,20 +121,18 @@ test.describe('Auto-Save Race Conditions - Title Field', () => {
 
     // Type character by character with small delays (simulates real typing)
     const fullTitle = 'This is a long title that takes time to type';
-    for (const char of fullTitle) {
-      await page.keyboard.type(char);
-      await page.waitForTimeout(50); // 50ms between characters
-    }
+    await page.keyboard.type(fullTitle, { delay: 50 });
+    await titleInput.blur();
 
-    // Wait for final save to complete
-    await page.waitForTimeout(1500);
+    await waitForDocumentPatchTitle(page, fullTitle);
+    await waitForSyncStatus(page);
 
     // Title should be the full string, not truncated by intermediate saves
     await expect(titleInput).toHaveValue(fullTitle);
 
     // Reload to verify full title was saved
     await page.reload();
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 });
+    await waitForEditorReady(page);
     await expect(page.locator('textarea[placeholder="Untitled"]')).toHaveValue(fullTitle);
   });
 
@@ -123,23 +143,28 @@ test.describe('Auto-Save Race Conditions - Title Field', () => {
     await titleInput.click();
 
     // First segment
+    let patch = waitForNextDocumentPatch(page);
     await titleInput.fill('Part 1');
-    await page.waitForTimeout(800); // Trigger save
+    await patch;
 
     // Second segment
+    patch = waitForNextDocumentPatch(page);
     await titleInput.fill('Part 1 and Part 2');
-    await page.waitForTimeout(800); // Trigger save
+    await patch;
 
     // Third segment
+    patch = waitForNextDocumentPatch(page);
     await titleInput.fill('Part 1 and Part 2 and Part 3');
-    await page.waitForTimeout(1500); // Wait for all saves
+    await titleInput.blur();
+    await patch;
+    await waitForSyncStatus(page);
 
     // Should have complete title
     await expect(titleInput).toHaveValue('Part 1 and Part 2 and Part 3');
 
     // Reload to verify
     await page.reload();
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 });
+    await waitForEditorReady(page);
     await expect(page.locator('textarea[placeholder="Untitled"]')).toHaveValue('Part 1 and Part 2 and Part 3');
   });
 
@@ -150,23 +175,23 @@ test.describe('Auto-Save Race Conditions - Title Field', () => {
 
     // Type first part
     await titleInput.click();
+    let patch = waitForNextDocumentPatch(page);
     await titleInput.fill('Bug:');
-
-    // Pause (trigger save)
-    await page.waitForTimeout(800);
+    await patch;
 
     // Continue typing
+    patch = waitForNextDocumentPatch(page);
     await titleInput.fill('Bug: login fails');
-
-    // Wait for responses
-    await page.waitForTimeout(1500);
+    await titleInput.blur();
+    await patch;
+    await waitForSyncStatus(page);
 
     // Should have full title
     await expect(titleInput).toHaveValue('Bug: login fails');
 
     // Reload to verify
     await page.reload();
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 });
+    await waitForEditorReady(page);
     await expect(page.locator('textarea[placeholder="Untitled"]')).toHaveValue('Bug: login fails');
   });
 });
@@ -200,14 +225,10 @@ test.describe('Auto-Save Race Conditions - Throttle Behavior', () => {
     await titleInput.click();
 
     // Type continuously for 3 seconds
-    const startTime = Date.now();
-    while (Date.now() - startTime < 3000) {
-      await page.keyboard.type('a');
-      await page.waitForTimeout(100);
-    }
+    await page.keyboard.type('a'.repeat(30), { delay: 100 });
+    await titleInput.blur();
 
-    // Wait for final save
-    await page.waitForTimeout(1000);
+    await expect.poll(() => apiCalls.length, { timeout: 15000 }).toBeGreaterThanOrEqual(3);
 
     // With throttle (500ms), we should have multiple saves during 3s of typing
     // Expect at least 3-4 intermediate saves (not just one at the end like debounce)
@@ -215,8 +236,10 @@ test.describe('Auto-Save Race Conditions - Throttle Behavior', () => {
 
     // Verify final title was saved correctly
     const currentValue = await titleInput.inputValue();
+    await waitForDocumentPatchTitle(page, currentValue);
+    await waitForSyncStatus(page);
     await page.reload();
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 });
+    await waitForEditorReady(page);
     await expect(page.locator('textarea[placeholder="Untitled"]')).toHaveValue(currentValue);
   });
 });
@@ -252,17 +275,17 @@ test.describe('Auto-Save Race Conditions - Error Recovery', () => {
 
     // Type title
     await titleInput.fill('Retryable Title');
-    await page.waitForTimeout(2000); // Wait for retry
+    await titleInput.blur();
+    await expect.poll(() => requestCount, { timeout: 15000 }).toBeGreaterThanOrEqual(2);
 
     // Remove route interception
     await context.unrouteAll();
 
-    // Wait a bit more and reload
-    await page.waitForTimeout(1000);
+    await waitForSyncStatus(page);
 
     // Verify it was eventually saved (via retry)
     await page.reload();
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 });
+    await waitForEditorReady(page);
     // Should have the title (either from retry or subsequent save)
     const finalTitle = await page.locator('textarea[placeholder="Untitled"]').inputValue();
     expect(finalTitle).toContain('Retryable');
@@ -278,9 +301,11 @@ test.describe('Auto-Save Race Conditions - Slow Network', () => {
     await createNewDocument(page);
 
     // Slow down PATCH responses significantly
+    let patchCount = 0;
     await context.route('**/api/documents/**', async (route) => {
       const request = route.request();
       if (request.method() === 'PATCH') {
+        patchCount++;
         // Delay response by 2 seconds
         await new Promise(resolve => setTimeout(resolve, 2000));
       }
@@ -292,16 +317,15 @@ test.describe('Auto-Save Race Conditions - Slow Network', () => {
 
     // Type "Slow" - this will trigger a save that takes 2s to respond
     await titleInput.fill('Slow');
-    await page.waitForTimeout(600); // Let throttle trigger
+    await expect.poll(() => patchCount, { timeout: 5000 }).toBeGreaterThanOrEqual(1);
 
     // Immediately type more - while first response is still pending
     await titleInput.fill('Slow and Fast');
-    await page.waitForTimeout(600);
 
     await titleInput.fill('Slow and Fast and Final');
+    await titleInput.blur();
 
-    // Wait for all responses (first slow response will arrive after ~2s)
-    await page.waitForTimeout(4000);
+    await waitForSyncStatus(page);
 
     // Should have the final value, not reverted to "Slow"
     await expect(titleInput).toHaveValue('Slow and Fast and Final');

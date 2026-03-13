@@ -35,7 +35,9 @@ import os from 'os';
  * - etc.
  */
 async function getWorkerPort(workerIndex: number): Promise<number> {
-  const BASE_PORT = 10000;
+  const BASE_PORT = process.env.PLAYWRIGHT_PORT_BASE
+    ? parseInt(process.env.PLAYWRIGHT_PORT_BASE, 10)
+    : 10000;
   const MAX_PORT = 65535;
   const PORTS_PER_WORKER = 100;
   const AVAILABLE_RANGE = MAX_PORT - BASE_PORT; // 55535 ports available
@@ -86,6 +88,12 @@ type WorkerFixtures = {
   apiServer: { url: string; process: ChildProcess };
   webServer: { url: string; process: ChildProcess };
 };
+
+export const deterministicSeedDocs = {
+  convergence: 'E2E Convergence Seed',
+  offlineReplay: 'E2E Offline Replay Seed',
+  rbacRevocation: 'E2E RBAC Revocation Seed',
+} as const;
 
 // Extend the base test with our isolated environment
 // Worker fixtures are accessible in tests but live at worker scope
@@ -322,8 +330,9 @@ async function runMigrations(dbUrl: string): Promise<void> {
 /**
  * Seed comprehensive test data matching the full seed script:
  * - 1 workspace with sprint_start_date 3 months ago
- * - 1 user (dev@ship.local / admin123)
- * - workspace membership + person document
+ * - 1 admin user (dev@ship.local / admin123)
+ * - 2 member users (alice.chen@ship.local, bob.martinez@ship.local / admin123)
+ * - workspace memberships + person documents
  * - 5 programs (Ship Core, Authentication, API Platform, Design System, Infrastructure)
  * - Sprints for each program
  * - Issues with various states
@@ -370,7 +379,15 @@ async function seedMinimalTestData(pool: Pool): Promise<void> {
   );
   const personId = personResult.rows[0].id;
 
-  // Create a member user (non-admin) for authorization tests
+  // Create member users (non-admin) for multi-user and authorization tests
+  const aliceResult = await pool.query(
+    `INSERT INTO users (email, password_hash, name, is_super_admin, last_workspace_id)
+     VALUES ('alice.chen@ship.local', $1, 'Alice Chen', false, $2)
+     RETURNING id`,
+    [passwordHash, workspaceId]
+  );
+  const aliceId = aliceResult.rows[0].id;
+
   const memberResult = await pool.query(
     `INSERT INTO users (email, password_hash, name, is_super_admin, last_workspace_id)
      VALUES ('bob.martinez@ship.local', $1, 'Bob Martinez', false, $2)
@@ -379,14 +396,24 @@ async function seedMinimalTestData(pool: Pool): Promise<void> {
   );
   const memberId = memberResult.rows[0].id;
 
-  // Create workspace membership as regular member (not admin)
+  // Create workspace memberships as regular members (not admin)
+  await pool.query(
+    `INSERT INTO workspace_memberships (workspace_id, user_id, role)
+     VALUES ($1, $2, 'member')`,
+    [workspaceId, aliceId]
+  );
   await pool.query(
     `INSERT INTO workspace_memberships (workspace_id, user_id, role)
      VALUES ($1, $2, 'member')`,
     [workspaceId, memberId]
   );
 
-  // Create person document for member
+  // Create person documents for members
+  await pool.query(
+    `INSERT INTO documents (workspace_id, document_type, title, properties, created_by)
+     VALUES ($1, 'person', 'Alice Chen', $2, $3)`,
+    [workspaceId, JSON.stringify({ user_id: aliceId, email: 'alice.chen@ship.local' }), userId]
+  );
   await pool.query(
     `INSERT INTO documents (workspace_id, document_type, title, properties, created_by)
      VALUES ($1, 'person', 'Bob Martinez', $2, $3)`,
@@ -785,6 +812,33 @@ async function seedMinimalTestData(pool: Pool): Promise<void> {
       `INSERT INTO documents (workspace_id, document_type, title, content, position, created_by)
        VALUES ($1, 'wiki', $2, $3, $4, $5)`,
       [workspaceId, doc.title, JSON.stringify(contentJson), i + 1, userId]
+    );
+  }
+
+  const deterministicScenarioDocs = [
+    {
+      title: deterministicSeedDocs.convergence,
+      text: 'Seeded convergence baseline content for overlap edits.',
+    },
+    {
+      title: deterministicSeedDocs.offlineReplay,
+      text: 'Seeded offline replay baseline content.',
+    },
+    {
+      title: deterministicSeedDocs.rbacRevocation,
+      text: 'Seeded RBAC revocation baseline content.',
+    },
+  ];
+
+  for (const doc of deterministicScenarioDocs) {
+    const contentJson = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: doc.text }] }],
+    };
+    await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, content, created_by)
+       VALUES ($1, 'wiki', $2, $3, $4)`,
+      [workspaceId, doc.title, JSON.stringify(contentJson), userId]
     );
   }
 }

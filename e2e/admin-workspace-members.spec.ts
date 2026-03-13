@@ -1,5 +1,19 @@
 import { test, expect, Page } from './fixtures/isolated-env'
 
+async function waitForUserSearchSettled(page: Page): Promise<void> {
+  const results = page.locator('button').filter({ hasText: /@/ })
+  const noResults = page.getByText('No users found')
+
+  await expect.poll(async () => {
+    if (await results.first().isVisible().catch(() => false)) return 'results'
+    if (await noResults.isVisible().catch(() => false)) return 'empty'
+    return 'pending'
+  }, {
+    timeout: 5000,
+    intervals: [100, 250, 500],
+  }).not.toBe('pending')
+}
+
 // Helper to login as super admin
 async function loginAsSuperAdmin(page: Page) {
   await page.context().clearCookies()
@@ -175,8 +189,7 @@ test.describe('Admin User Search', () => {
     // Type in search box
     await page.getByPlaceholder('Search by email...').fill('dev')
 
-    // Wait for debounced search results (300ms + network)
-    await page.waitForTimeout(500)
+    await waitForUserSearchSettled(page)
 
     // Should show search results or "No users found"
     const hasResults = await page.locator('button').filter({ hasText: /@/ }).first().isVisible().catch(() => false)
@@ -195,7 +208,7 @@ test.describe('Admin User Search', () => {
 
       // Search for a user
       await page.getByPlaceholder('Search by email...').fill('bob')
-      await page.waitForTimeout(500)
+      await waitForUserSearchSettled(page)
 
       // If results show, click one
       const userResult = page.locator('button').filter({ hasText: /bob/i }).first()
@@ -224,7 +237,7 @@ test.describe('Admin User Search', () => {
 
       // Search for a user not in the workspace
       await page.getByPlaceholder('Search by email...').fill('carol')
-      await page.waitForTimeout(500)
+      await waitForUserSearchSettled(page)
 
       const userResult = page.locator('button').filter({ hasText: /carol/i }).first()
       if (await userResult.isVisible()) {
