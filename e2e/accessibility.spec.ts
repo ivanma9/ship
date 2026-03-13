@@ -102,6 +102,46 @@ test.describe('Accessibility - axe-core audit', () => {
 
     expect(criticalViolations).toHaveLength(0)
   })
+
+  test('projects page has no critical accessibility violations', async ({ page }) => {
+    await login(page)
+    await page.goto('/projects')
+    await page.waitForLoadState('networkidle')
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze()
+
+    const criticalViolations = results.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious'
+    )
+
+    if (criticalViolations.length > 0) {
+      console.log('Critical violations:', JSON.stringify(criticalViolations, null, 2))
+    }
+
+    expect(criticalViolations).toHaveLength(0)
+  })
+
+  test('team allocation page has no critical accessibility violations', async ({ page }) => {
+    await login(page)
+    await page.goto('/team/allocation')
+    await page.waitForLoadState('networkidle')
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze()
+
+    const criticalViolations = results.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious'
+    )
+
+    if (criticalViolations.length > 0) {
+      console.log('Critical violations:', JSON.stringify(criticalViolations, null, 2))
+    }
+
+    expect(criticalViolations).toHaveLength(0)
+  })
 })
 
 test.describe('Accessibility - Keyboard Navigation', () => {
