@@ -31,8 +31,11 @@ test.describe('Accessibility - axe-core audit', () => {
     expect(criticalViolations).toHaveLength(0)
   })
 
-  test('main app shell has no critical accessibility violations', async ({ page }) => {
+  test('dashboard (/my-week) has no critical accessibility violations', async ({ page }) => {
     await login(page)
+    // Explicitly navigate to the dashboard route (the app routes /dashboard mode to /my-week;
+    // /my-week is the canonical URL — required by FR-005)
+    await page.goto('/my-week')
     await page.waitForLoadState('networkidle')
 
     const results = await new AxeBuilder({ page })
