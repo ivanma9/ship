@@ -47,6 +47,11 @@ jobs:
       - name: Check type violation ceiling
         run: ./scripts/count-type-violations.sh 416
 
+      - name: Run database migrations
+        run: pnpm db:migrate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ship_test
+
       - name: Run unit tests
         run: pnpm test
         env:
