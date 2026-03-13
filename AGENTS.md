@@ -176,6 +176,9 @@ A skill is a set of local instructions to follow that is stored in a `SKILL.md` 
 - PostgreSQL for API and collaboration state; generated coverage reports and `test-results/summary.json` for test evidence (003-improve-test-reliability)
 - TypeScript across `api/`, `web/`, and `shared/` on Node.js 20+ + Express, `pg`, Zod/OpenAPI registry, React, Vite, Vitest, TipTap, Yjs (004-optimize-query-flows)
 - PostgreSQL with direct SQL access; JSON audit artifacts in `audits/artifacts/` for performance evidence (004-optimize-query-flows)
+- TypeScript across `api/`, `web/`, and `shared/` on Node.js 20+ + Express, `pg`, Zod/OpenAPI registry, React, Vite, TanStack Query, Vitest, TipTap, Yjs (005-api-latency-list-endpoints)
+- PostgreSQL with direct SQL; benchmark/audit evidence stored under `audits/` and `audits/artifacts/` (005-api-latency-list-endpoints)
+- PostgreSQL with direct SQL; before/after evidence stored in `audits/api-response-time.md`, `audits/consolidated-audit-report-2026-03-10.md`, and `audits/artifacts/` (005-api-latency-list-endpoints)
 
 ## Recent Changes
 - 002-runtime-resilience: Added TypeScript across `api/`, `web/`, and `shared/` + Express, `pg`, React, Vite, TanStack Query, TipTap, Yjs, Zod

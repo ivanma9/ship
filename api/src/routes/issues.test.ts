@@ -550,3 +550,226 @@ describe('Issues API', () => {
     })
   })
 })
+
+describe('Issues API - List contract after latency optimisation', () => {
+  const app = createApp()
+  const testRunId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  const testEmail = `issues-contract-${testRunId}@ship.local`
+  const testWorkspaceName = `Issues Contract Test ${testRunId}`
+
+  let sessionCookie: string
+  let csrfToken: string
+  let testWorkspaceId: string
+  let testUserId: string
+  let testProgramId: string
+  let testSprintId: string
+
+  beforeAll(async () => {
+    const workspaceResult = await pool.query(
+      `INSERT INTO workspaces (name) VALUES ($1) RETURNING id`,
+      [testWorkspaceName]
+    )
+    testWorkspaceId = workspaceResult.rows[0].id
+
+    const userResult = await pool.query(
+      `INSERT INTO users (email, password_hash, name)
+       VALUES ($1, 'test-hash', 'Contract Test User')
+       RETURNING id`,
+      [testEmail]
+    )
+    testUserId = userResult.rows[0].id
+
+    await pool.query(
+      `INSERT INTO workspace_memberships (workspace_id, user_id, role)
+       VALUES ($1, $2, 'member')`,
+      [testWorkspaceId, testUserId]
+    )
+
+    const sessionId = crypto.randomBytes(32).toString('hex')
+    await pool.query(
+      `INSERT INTO sessions (id, user_id, workspace_id, expires_at)
+       VALUES ($1, $2, $3, now() + interval '1 hour')`,
+      [sessionId, testUserId, testWorkspaceId]
+    )
+    sessionCookie = `session_id=${sessionId}`
+
+    const csrfRes = await request(app).get('/api/csrf-token').set('Cookie', sessionCookie)
+    csrfToken = csrfRes.body.token
+    const connectSid = csrfRes.headers['set-cookie']?.[0]?.split(';')[0] || ''
+    if (connectSid) sessionCookie = `${sessionCookie}; ${connectSid}`
+
+    const programResult = await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility)
+       VALUES ($1, 'program', 'Test Program', 'workspace') RETURNING id`,
+      [testWorkspaceId]
+    )
+    testProgramId = programResult.rows[0].id
+
+    const sprintResult = await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility)
+       VALUES ($1, 'sprint', 'Test Sprint', 'workspace') RETURNING id`,
+      [testWorkspaceId]
+    )
+    testSprintId = sprintResult.rows[0].id
+  })
+
+  afterAll(async () => {
+    await pool.query('DELETE FROM document_associations WHERE document_id IN (SELECT id FROM documents WHERE workspace_id = $1)', [testWorkspaceId])
+    await pool.query('DELETE FROM sessions WHERE user_id = $1', [testUserId])
+    await pool.query('DELETE FROM documents WHERE workspace_id = $1', [testWorkspaceId])
+    await pool.query('DELETE FROM workspace_memberships WHERE user_id = $1', [testUserId])
+    await pool.query('DELETE FROM users WHERE id = $1', [testUserId])
+    await pool.query('DELETE FROM workspaces WHERE id = $1', [testWorkspaceId])
+  })
+
+  it('list response does not include content field', async () => {
+    await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, properties, content)
+       VALUES ($1, 'issue', 'Content Check Issue', 'workspace', $2, $3, '{"type":"doc","content":[]}')`,
+      [testWorkspaceId, testUserId, JSON.stringify({ state: 'backlog', priority: 'medium' })]
+    )
+
+    const res = await request(app)
+      .get('/api/issues')
+      .set('Cookie', sessionCookie)
+
+    expect(res.status).toBe(200)
+    const issue = res.body.find((i: { title: string }) => i.title === 'Content Check Issue')
+    expect(issue).toBeDefined()
+    expect(issue).not.toHaveProperty('content')
+  })
+
+  it('list response includes display_id in #N format and ticket_number', async () => {
+    const res = await request(app)
+      .get('/api/issues')
+      .set('Cookie', sessionCookie)
+
+    expect(res.status).toBe(200)
+    expect(res.body.length).toBeGreaterThan(0)
+    for (const issue of res.body) {
+      expect(issue).toHaveProperty('ticket_number')
+      expect(issue).toHaveProperty('display_id')
+      expect(issue.display_id).toBe(`#${issue.ticket_number}`)
+    }
+  })
+
+  it('list response includes belongs_to association array', async () => {
+    const issueResult = await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, properties)
+       VALUES ($1, 'issue', 'Associated Issue', 'workspace', $2, $3)
+       RETURNING id`,
+      [testWorkspaceId, testUserId, JSON.stringify({ state: 'backlog', priority: 'medium' })]
+    )
+    const issueId = issueResult.rows[0].id
+
+    await pool.query(
+      `INSERT INTO document_associations (document_id, related_id, relationship_type)
+       VALUES ($1, $2, 'program')`,
+      [issueId, testProgramId]
+    )
+
+    const res = await request(app)
+      .get('/api/issues')
+      .set('Cookie', sessionCookie)
+
+    expect(res.status).toBe(200)
+    const issue = res.body.find((i: { id: string }) => i.id === issueId)
+    expect(issue).toBeDefined()
+    expect(Array.isArray(issue.belongs_to)).toBe(true)
+    expect(issue.belongs_to.length).toBeGreaterThan(0)
+    expect(issue.belongs_to[0]).toHaveProperty('type')
+    expect(issue.belongs_to[0]).toHaveProperty('id')
+  })
+
+  it('filters issues by state', async () => {
+    await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, properties)
+       VALUES ($1, 'issue', 'Done Issue State Test', 'workspace', $2, $3)`,
+      [testWorkspaceId, testUserId, JSON.stringify({ state: 'done', priority: 'medium' })]
+    )
+
+    const res = await request(app)
+      .get('/api/issues?state=done')
+      .set('Cookie', sessionCookie)
+
+    expect(res.status).toBe(200)
+    expect(res.body.every((i: { state: string }) => i.state === 'done')).toBe(true)
+    expect(res.body.some((i: { title: string }) => i.title === 'Done Issue State Test')).toBe(true)
+  })
+
+  it('filters issues by priority', async () => {
+    await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, properties)
+       VALUES ($1, 'issue', 'Urgent Priority Test', 'workspace', $2, $3)`,
+      [testWorkspaceId, testUserId, JSON.stringify({ state: 'backlog', priority: 'urgent' })]
+    )
+
+    const res = await request(app)
+      .get('/api/issues?priority=urgent')
+      .set('Cookie', sessionCookie)
+
+    expect(res.status).toBe(200)
+    expect(res.body.every((i: { priority: string }) => i.priority === 'urgent')).toBe(true)
+    expect(res.body.some((i: { title: string }) => i.title === 'Urgent Priority Test')).toBe(true)
+  })
+
+  it('filters issues by sprint_id via junction table', async () => {
+    const issueResult = await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, properties)
+       VALUES ($1, 'issue', 'Sprint Filter Issue', 'workspace', $2, $3)
+       RETURNING id`,
+      [testWorkspaceId, testUserId, JSON.stringify({ state: 'backlog', priority: 'medium' })]
+    )
+    const issueId = issueResult.rows[0].id
+
+    await pool.query(
+      `INSERT INTO document_associations (document_id, related_id, relationship_type)
+       VALUES ($1, $2, 'sprint')`,
+      [issueId, testSprintId]
+    )
+
+    const res = await request(app)
+      .get(`/api/issues?sprint_id=${testSprintId}`)
+      .set('Cookie', sessionCookie)
+
+    expect(res.status).toBe(200)
+    expect(res.body.some((i: { id: string }) => i.id === issueId)).toBe(true)
+    // Issues NOT in sprint should not appear
+    const otherIssue = res.body.find((i: { title: string }) => i.title === 'Content Check Issue')
+    expect(otherIssue).toBeUndefined()
+  })
+
+  it('filters top_level issues (no parent)', async () => {
+    const parentResult = await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, properties)
+       VALUES ($1, 'issue', 'Parent Issue Filter', 'workspace', $2, $3)
+       RETURNING id`,
+      [testWorkspaceId, testUserId, JSON.stringify({ state: 'backlog', priority: 'medium' })]
+    )
+    const parentId = parentResult.rows[0].id
+
+    const childResult = await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, properties)
+       VALUES ($1, 'issue', 'Child Issue Filter', 'workspace', $2, $3)
+       RETURNING id`,
+      [testWorkspaceId, testUserId, JSON.stringify({ state: 'backlog', priority: 'medium' })]
+    )
+    const childId = childResult.rows[0].id
+
+    // child references parent via 'parent' relationship
+    await pool.query(
+      `INSERT INTO document_associations (document_id, related_id, relationship_type)
+       VALUES ($1, $2, 'parent')`,
+      [childId, parentId]
+    )
+
+    const res = await request(app)
+      .get('/api/issues?parent_filter=top_level')
+      .set('Cookie', sessionCookie)
+
+    expect(res.status).toBe(200)
+    const ids = res.body.map((i: { id: string }) => i.id)
+    expect(ids).toContain(parentId)
+    expect(ids).not.toContain(childId)
+  })
+})

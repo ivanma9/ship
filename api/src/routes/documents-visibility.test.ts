@@ -587,4 +587,73 @@ describe('Document Visibility', () => {
       );
     });
   });
+
+  describe('Wiki list visibility after query optimisation', () => {
+    it('workspace-visible wiki is visible to all workspace members', async () => {
+      await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by)
+         VALUES ($1, 'wiki', 'Shared Wiki', 'workspace', $2)`,
+        [testWorkspaceId, user1Id]
+      );
+
+      const res = await request(app)
+        .get('/api/documents?type=wiki')
+        .set('Cookie', user2SessionCookie);
+
+      expect(res.status).toBe(200);
+      const titles = res.body.map((d: { title: string }) => d.title);
+      expect(titles).toContain('Shared Wiki');
+    });
+
+    it('private wiki is only visible to its creator', async () => {
+      await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by)
+         VALUES ($1, 'wiki', 'Private Wiki Vis Test', 'private', $2)`,
+        [testWorkspaceId, user1Id]
+      );
+
+      const resCreator = await request(app)
+        .get('/api/documents?type=wiki')
+        .set('Cookie', user1SessionCookie);
+      expect(resCreator.body.some((d: { title: string }) => d.title === 'Private Wiki Vis Test')).toBe(true);
+
+      const resOther = await request(app)
+        .get('/api/documents?type=wiki')
+        .set('Cookie', user2SessionCookie);
+      expect(resOther.body.some((d: { title: string }) => d.title === 'Private Wiki Vis Test')).toBe(false);
+    });
+
+    it('admin can see all wikis regardless of visibility', async () => {
+      await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by)
+         VALUES ($1, 'wiki', 'Admin-Only Wiki Check', 'private', $2)`,
+        [testWorkspaceId, user1Id]
+      );
+
+      const res = await request(app)
+        .get('/api/documents?type=wiki')
+        .set('Cookie', adminSessionCookie);
+
+      expect(res.status).toBe(200);
+      expect(res.body.some((d: { title: string }) => d.title === 'Admin-Only Wiki Check')).toBe(true);
+    });
+
+    it('list response does not include content or yjs_state columns', async () => {
+      await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, content)
+         VALUES ($1, 'wiki', 'Content Check Wiki', 'workspace', $2, '{"type":"doc","content":[]}')`,
+        [testWorkspaceId, user1Id]
+      );
+
+      const res = await request(app)
+        .get('/api/documents?type=wiki')
+        .set('Cookie', user1SessionCookie);
+
+      expect(res.status).toBe(200);
+      const doc = res.body.find((d: { title: string }) => d.title === 'Content Check Wiki');
+      expect(doc).toBeDefined();
+      expect(doc).not.toHaveProperty('content');
+      expect(doc).not.toHaveProperty('yjs_state');
+    });
+  });
 });
