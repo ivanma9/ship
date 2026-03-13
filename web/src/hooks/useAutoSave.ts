@@ -14,6 +14,10 @@ interface UseAutoSaveOptions {
   onFailure?: (error: unknown, value: string, context: AutoSaveFailureContext) => void;
 }
 
+export type AutoSaveHandler = ((value: string) => void) & {
+  flush: (value?: string) => Promise<void>;
+};
+
 export function useAutoSave({
   onSave,
   throttleMs = 500,
@@ -45,6 +49,9 @@ export function useAutoSave({
     isSavingRef.current = true;
     try {
       await onSave(value);
+      if (sequence < saveSequenceRef.current) {
+        return;
+      }
       lastSaveTimeRef.current = Date.now();
       onSuccess?.(value);
 
@@ -56,6 +63,16 @@ export function useAutoSave({
         await save(pending, saveSequenceRef.current);
       }
     } catch (err) {
+      if (sequence < saveSequenceRef.current) {
+        return;
+      }
+      if (pendingValueRef.current !== null && pendingValueRef.current !== value) {
+        const pending = pendingValueRef.current;
+        pendingValueRef.current = null;
+        saveSequenceRef.current++;
+        await save(pending, saveSequenceRef.current);
+        return;
+      }
       const attemptCount = retryCount + 1;
       if (retryCount < maxRetries) {
         await new Promise(r => setTimeout(r, getRetryDelayMs(retryCount)));
@@ -67,11 +84,39 @@ export function useAutoSave({
           maxRetries,
           terminal: true,
         });
+
+        if (pendingValueRef.current !== null && pendingValueRef.current !== value) {
+          const pending = pendingValueRef.current;
+          pendingValueRef.current = null;
+          saveSequenceRef.current++;
+          await save(pending, saveSequenceRef.current);
+        }
       }
     } finally {
       isSavingRef.current = false;
     }
   }, [getRetryDelayMs, maxRetries, onFailure, onSave, onSuccess]);
+
+  const flushSave = useCallback(async (value?: string) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    const nextValue = value ?? pendingValueRef.current;
+    if (nextValue === null) {
+      return;
+    }
+
+    if (isSavingRef.current) {
+      pendingValueRef.current = nextValue;
+      return;
+    }
+
+    pendingValueRef.current = null;
+    saveSequenceRef.current++;
+    await save(nextValue, saveSequenceRef.current);
+  }, [save]);
 
   const throttledSave = useCallback((value: string) => {
     const now = Date.now();
@@ -94,10 +139,17 @@ export function useAutoSave({
 
     // Always schedule a trailing save
     timeoutRef.current = setTimeout(() => {
+      if (isSavingRef.current) {
+        pendingValueRef.current = value;
+        return;
+      }
       saveSequenceRef.current++;
       save(value, saveSequenceRef.current);
     }, throttleMs);
   }, [save, throttleMs]);
 
-  return throttledSave;
+  const autoSave = throttledSave as AutoSaveHandler;
+  autoSave.flush = flushSave;
+
+  return autoSave;
 }

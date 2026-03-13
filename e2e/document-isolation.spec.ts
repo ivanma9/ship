@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/isolated-env';
+import { waitForSyncStatus } from './fixtures/test-helpers';
 
 // Helper to get editor text content without collaboration cursor labels
 async function getEditorTextWithoutCursor(page: import('@playwright/test').Page): Promise<string> {
@@ -42,8 +43,7 @@ async function createNewDocument(page: import('@playwright/test').Page): Promise
 
   // Wait for editor
   await page.waitForSelector('.ProseMirror', { timeout: 10000 });
-  // Wait for sync status - can be Saved, Cached, Saving, or Offline
-  await page.waitForSelector('text=/Saved|Cached|Saving|Offline/', { timeout: 15000 });
+  await waitForSyncStatus(page, /Saved|Cached|Saving|Offline/);
 
   return newUrl;
 }
@@ -234,8 +234,7 @@ test.describe('Document Isolation - Critical Data Integrity', () => {
       // Go to doc 1 and type
       await page.goto(doc1Url);
       await page.waitForSelector('.ProseMirror', { timeout: 10000 });
-      // Wait for sync - use longer timeout and accept either Saved or Synced status
-      await expect(page.locator('text=/Saved|Cached|Saving|Offline/')).toBeVisible({ timeout: 15000 });
+      await waitForSyncStatus(page, /Saved|Cached|Saving|Offline/);
       // Wait for existing content to load
       await expect(async () => {
         const content = await getEditorTextWithoutCursor(page);
@@ -254,14 +253,14 @@ test.describe('Document Isolation - Critical Data Integrity', () => {
         expect(content).toContain(`DOC1-ITER${i}`);
       }).toPass({ timeout: 10000 });
       // Wait for sync to complete - accept either Saved or Synced status
-      await expect(page.locator('text=/Saved|Cached|Saving|Offline/')).toBeVisible({ timeout: 15000 });
+      await waitForSyncStatus(page, /Saved|Cached|Saving|Offline/);
       await page.waitForTimeout(300); // Extra sync time
 
       // Go to doc 2 and type
       await page.goto(doc2Url);
       await page.waitForSelector('.ProseMirror', { timeout: 10000 });
       // Wait for sync - accept either Saved or Synced status
-      await expect(page.locator('text=/Saved|Cached|Saving|Offline/')).toBeVisible({ timeout: 15000 });
+      await waitForSyncStatus(page, /Saved|Cached|Saving|Offline/);
       // Wait for existing content to load
       await expect(async () => {
         const content = await getEditorTextWithoutCursor(page);
@@ -280,14 +279,14 @@ test.describe('Document Isolation - Critical Data Integrity', () => {
         expect(content).toContain(`DOC2-ITER${i}`);
       }).toPass({ timeout: 10000 });
       // Wait for sync to complete - accept either Saved or Synced status
-      await expect(page.locator('text=/Saved|Cached|Saving|Offline/')).toBeVisible({ timeout: 15000 });
+      await waitForSyncStatus(page, /Saved|Cached|Saving|Offline/);
       await page.waitForTimeout(300); // Extra sync time
     }
 
     // Verify doc 1 has only DOC1 content
     await page.goto(doc1Url);
     await page.waitForSelector('.ProseMirror', { timeout: 10000 });
-    await expect(page.locator('text=/Saved|Cached|Saving|Offline/')).toBeVisible({ timeout: 15000 });
+    await waitForSyncStatus(page, /Saved|Cached|Saving|Offline/);
 
     const doc1Content = await getEditorTextWithoutCursor(page);
 
@@ -300,7 +299,7 @@ test.describe('Document Isolation - Critical Data Integrity', () => {
     // Verify doc 2 has only DOC2 content
     await page.goto(doc2Url);
     await page.waitForSelector('.ProseMirror', { timeout: 10000 });
-    await expect(page.locator('text=/Saved|Cached|Saving|Offline/')).toBeVisible({ timeout: 15000 });
+    await waitForSyncStatus(page, /Saved|Cached|Saving|Offline/);
 
     const doc2Content = await getEditorTextWithoutCursor(page);
 

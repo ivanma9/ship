@@ -7,6 +7,8 @@ dist
 build
 .turbo
 *.tsbuildinfo
+api/coverage/
+web/coverage/
 
 # Environment files
 .env
@@ -44,6 +46,9 @@ Thumbs.db
 
 # Codex/agent skills
 .agents/
+.codex/
+ship/.codex/
+ship/.specify/
 
 # Playwright MCP screenshots
 .playwright-mcp/

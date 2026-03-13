@@ -621,6 +621,31 @@ export function broadcastToWorkspace(workspaceId: string, eventType: string, dat
   }
 }
 
+export function disconnectUserFromWorkspace(workspaceId: string, userId: string, reason = 'Workspace access revoked'): void {
+  let collaborationClosed = 0;
+  conns.forEach((conn, ws) => {
+    if (conn.workspaceId === workspaceId && conn.userId === userId && ws.readyState === WebSocket.OPEN) {
+      ws.close(4403, reason);
+      collaborationClosed++;
+    }
+  });
+
+  let eventsClosed = 0;
+  eventConns.forEach((conn, ws) => {
+    if (conn.workspaceId === workspaceId && conn.userId === userId && ws.readyState === WebSocket.OPEN) {
+      ws.close(4403, reason);
+      eventsClosed++;
+    }
+  });
+
+  if (collaborationClosed > 0 || eventsClosed > 0) {
+    console.log(
+      `[Collaboration] Disconnected user ${userId} from workspace ${workspaceId} ` +
+      `(${collaborationClosed} collaboration, ${eventsClosed} event connections)`,
+    );
+  }
+}
+
 // DDoS protection: Max WebSocket message size (10MB, matches REST API limit)
 const MAX_WS_MESSAGE_SIZE = 10 * 1024 * 1024;
 

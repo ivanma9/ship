@@ -87,4 +87,133 @@ describe('useAutoSave', () => {
 
     expect(onSuccess).toHaveBeenCalledWith('Title B');
   });
+
+  it('flushes the latest queued value immediately', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() => useAutoSave({
+      onSave,
+      throttleMs: 1000,
+    }));
+
+    act(() => {
+      result.current('Draft Title');
+    });
+
+    await act(async () => {
+      await result.current.flush('Final Title');
+    });
+
+    expect(onSave).toHaveBeenCalledWith('Final Title');
+  });
+
+  it('does not start a trailing save while a prior save is still in flight', async () => {
+    let resolveSave: (() => void) | null = null;
+    const onSave = vi.fn(() => new Promise<void>((resolve) => {
+      resolveSave = resolve;
+    }));
+
+    const { result } = renderHook(() => useAutoSave({
+      onSave,
+      throttleMs: 100,
+    }));
+
+    act(() => {
+      result.current('Title A');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    act(() => {
+      result.current('Title B');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSave?.();
+      await Promise.resolve();
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(onSave.mock.calls[1]).toEqual(['Title B']);
+  });
+
+  it('saves a newer pending value after an earlier save exhausts retries', async () => {
+    const onSave = vi.fn()
+      .mockRejectedValueOnce(new Error('stuck save'))
+      .mockRejectedValueOnce(new Error('stuck save'))
+      .mockResolvedValueOnce(undefined);
+
+    const { result } = renderHook(() => useAutoSave({
+      onSave,
+      throttleMs: 100,
+      maxRetries: 1,
+    }));
+
+    act(() => {
+      result.current('Title A');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+      await Promise.resolve();
+    });
+
+    act(() => {
+      result.current('Title B');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+      await Promise.resolve();
+      await vi.runAllTimersAsync();
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(3);
+    expect(onSave.mock.calls[2]).toEqual(['Title B']);
+  });
+
+  it('prefers a newer pending value over retrying a failed stale value', async () => {
+    let rejectSave: ((error: Error) => void) | null = null;
+    const onSave = vi.fn()
+      .mockImplementationOnce(() => new Promise<void>((_, reject) => {
+        rejectSave = reject;
+      }))
+      .mockResolvedValueOnce(undefined);
+
+    const { result } = renderHook(() => useAutoSave({
+      onSave,
+      throttleMs: 100,
+      maxRetries: 2,
+    }));
+
+    act(() => {
+      result.current('Title A');
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+      await Promise.resolve();
+    });
+
+    act(() => {
+      result.current('Title B');
+    });
+
+    await act(async () => {
+      rejectSave?.(new Error('save failed'));
+      await Promise.resolve();
+      await vi.runAllTimersAsync();
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(2);
+    expect(onSave.mock.calls[1]).toEqual(['Title B']);
+  });
 });

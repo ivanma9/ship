@@ -35,7 +35,9 @@ import os from 'os';
  * - etc.
  */
 async function getWorkerPort(workerIndex: number): Promise<number> {
-  const BASE_PORT = 10000;
+  const BASE_PORT = process.env.PLAYWRIGHT_PORT_BASE
+    ? parseInt(process.env.PLAYWRIGHT_PORT_BASE, 10)
+    : 10000;
   const MAX_PORT = 65535;
   const PORTS_PER_WORKER = 100;
   const AVAILABLE_RANGE = MAX_PORT - BASE_PORT; // 55535 ports available
@@ -86,6 +88,12 @@ type WorkerFixtures = {
   apiServer: { url: string; process: ChildProcess };
   webServer: { url: string; process: ChildProcess };
 };
+
+export const deterministicSeedDocs = {
+  convergence: 'E2E Convergence Seed',
+  offlineReplay: 'E2E Offline Replay Seed',
+  rbacRevocation: 'E2E RBAC Revocation Seed',
+} as const;
 
 // Extend the base test with our isolated environment
 // Worker fixtures are accessible in tests but live at worker scope
@@ -804,6 +812,33 @@ async function seedMinimalTestData(pool: Pool): Promise<void> {
       `INSERT INTO documents (workspace_id, document_type, title, content, position, created_by)
        VALUES ($1, 'wiki', $2, $3, $4, $5)`,
       [workspaceId, doc.title, JSON.stringify(contentJson), i + 1, userId]
+    );
+  }
+
+  const deterministicScenarioDocs = [
+    {
+      title: deterministicSeedDocs.convergence,
+      text: 'Seeded convergence baseline content for overlap edits.',
+    },
+    {
+      title: deterministicSeedDocs.offlineReplay,
+      text: 'Seeded offline replay baseline content.',
+    },
+    {
+      title: deterministicSeedDocs.rbacRevocation,
+      text: 'Seeded RBAC revocation baseline content.',
+    },
+  ];
+
+  for (const doc of deterministicScenarioDocs) {
+    const contentJson = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: doc.text }] }],
+    };
+    await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, content, created_by)
+       VALUES ($1, 'wiki', $2, $3, $4)`,
+      [workspaceId, doc.title, JSON.stringify(contentJson), userId]
     );
   }
 }

@@ -172,6 +172,10 @@ A skill is a set of local instructions to follow that is stored in a `SKILL.md` 
 ## Active Technologies
 - TypeScript across `api/`, `web/`, and `shared/` + Express, `pg`, React, Vite, TanStack Query, TipTap, Yjs, Zod (002-runtime-resilience)
 - PostgreSQL for authoritative document state; IndexedDB/Yjs cache for editor state (002-runtime-resilience)
+- TypeScript across `api/`, `web/`, and `shared/` on Node.js 20+ + Express, `pg`, React, Vite, Vitest, Playwright, Testcontainers, TanStack Query, TipTap, Yjs (003-improve-test-reliability)
+- PostgreSQL for API and collaboration state; generated coverage reports and `test-results/summary.json` for test evidence (003-improve-test-reliability)
+- TypeScript across `api/`, `web/`, and `shared/` on Node.js 20+ + Express, `pg`, Zod/OpenAPI registry, React, Vite, Vitest, TipTap, Yjs (004-optimize-query-flows)
+- PostgreSQL with direct SQL access; JSON audit artifacts in `audits/artifacts/` for performance evidence (004-optimize-query-flows)
 
 ## Recent Changes
 - 002-runtime-resilience: Added TypeScript across `api/`, `web/`, and `shared/` + Express, `pg`, React, Vite, TanStack Query, TipTap, Yjs, Zod

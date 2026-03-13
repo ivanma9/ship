@@ -213,10 +213,12 @@ export function UnifiedEditor({
   const [titleSaveError, setTitleSaveError] = useState<string | null>(null);
   const [titleConflict, setTitleConflict] = useState<TitleConflictState | null>(null);
   const expectedUpdatedAtRef = useRef(document.updated_at);
+  const expectedTitleRef = useRef(document.title);
   const latestLocalTitleRef = useRef(document.title);
 
   useEffect(() => {
     expectedUpdatedAtRef.current = document.updated_at;
+    expectedTitleRef.current = document.title;
     latestLocalTitleRef.current = document.title;
   }, [document.id, document.title, document.updated_at]);
 
@@ -252,13 +254,14 @@ export function UnifiedEditor({
     onSave: async (title: string) => {
       if (!title) return;
       latestLocalTitleRef.current = title;
-      const payload: Partial<UnifiedDocument> & { expected_updated_at?: string } = {
+      const payload: Partial<UnifiedDocument> & { expected_updated_at?: string; expected_title?: string } = {
         title,
-        expected_updated_at: expectedUpdatedAtRef.current,
+        expected_title: expectedTitleRef.current,
       };
 
       const result = await (onUpdate(payload as Partial<UnifiedDocument>) as Promise<{ title?: string; updated_at?: string } | void>);
       if (result && typeof result.title === 'string') {
+        expectedTitleRef.current = result.title;
         latestLocalTitleRef.current = result.title;
       }
       if (result && typeof result.updated_at === 'string') {
@@ -266,6 +269,7 @@ export function UnifiedEditor({
       }
     },
     onSuccess: (savedTitle) => {
+      expectedTitleRef.current = savedTitle;
       latestLocalTitleRef.current = savedTitle;
       setTitleSaveError(null);
       setTitleConflict(null);
@@ -274,6 +278,7 @@ export function UnifiedEditor({
       const requestError = error as RequestError | undefined;
       if (requestError?.status === 409 && requestError.currentTitle && requestError.currentUpdatedAt) {
         expectedUpdatedAtRef.current = requestError.currentUpdatedAt;
+        expectedTitleRef.current = requestError.currentTitle;
         setTitleConflict({
           attemptedTitle: requestError.attemptedTitle || latestLocalTitleRef.current || document.title,
           currentTitle: requestError.currentTitle,
@@ -289,6 +294,11 @@ export function UnifiedEditor({
     throttledTitleSave(title);
   }, [throttledTitleSave]);
 
+  const handleTitleBlur = useCallback((title: string) => {
+    latestLocalTitleRef.current = title;
+    void throttledTitleSave.flush(title);
+  }, [throttledTitleSave]);
+
   const handleRetryTitleSave = useCallback(async () => {
     if (!titleConflict) return;
 
@@ -296,9 +306,10 @@ export function UnifiedEditor({
     try {
       const result = await onUpdate({
         title: retryTitle,
-        expected_updated_at: titleConflict.currentUpdatedAt,
+        expected_title: titleConflict.currentTitle,
       } as Partial<UnifiedDocument>) as { updated_at?: string } | void;
 
+      expectedTitleRef.current = retryTitle;
       latestLocalTitleRef.current = retryTitle;
       if (result?.updated_at) {
         expectedUpdatedAtRef.current = result.updated_at;
@@ -557,6 +568,7 @@ export function UnifiedEditor({
       userName={user.name}
       initialTitle={document.title}
       onTitleChange={isTitleReadOnly ? undefined : handleTitleChange}
+      onTitleBlur={isTitleReadOnly ? undefined : handleTitleBlur}
       titleReadOnly={isTitleReadOnly}
       onBack={onBack}
       backLabel={backLabel}

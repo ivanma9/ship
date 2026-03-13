@@ -31,20 +31,7 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- **Type Safety Audit**: Identify changed contracts, shared types, validation
-  boundaries, and any temporary type escapes that need approval.
-- **Bundle Size Audit**: Estimate client bundle impact, planned code splitting, and
-  any new frontend dependency cost.
-- **API Response Time**: List changed endpoints and the latency target plus how it
-  will be measured.
-- **Database Query Efficiency**: Identify changed queries, batching/index needs, and
-  any path requiring `EXPLAIN` evidence.
-- **Test Coverage and Quality**: Specify the exact unit, integration, or E2E tests
-  that will prove the change and cover at least one failure path.
-- **Runtime Errors and Edge Cases**: Enumerate empty states, invalid inputs,
-  concurrent edits, and fallback/error-handling behavior.
-- **Accessibility Compliance**: For UI work, define keyboard flow, focus handling,
-  semantics, and accessibility verification.
+[Gates determined based on constitution file]
 
 ## Project Structure
 

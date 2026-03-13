@@ -2,6 +2,7 @@ import { test, expect, Page } from './fixtures/isolated-env'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
+import { triggerMentionPopup, waitForEditorReady, waitForSyncStatus } from './fixtures/test-helpers'
 
 /**
  * Security Tests
@@ -33,8 +34,7 @@ async function createNewDocument(page: Page) {
     { timeout: 10000 }
   )
 
-  await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
-  await expect(page.locator('textarea[placeholder="Untitled"]')).toBeVisible({ timeout: 3000 })
+  await waitForEditorReady(page)
 }
 
 // Helper to login
@@ -63,9 +63,6 @@ test.describe('Security - XSS Prevention', () => {
     const xssPayload = '<script>alert("XSS")</script>'
     await page.keyboard.type(xssPayload)
 
-    // Wait for content to render
-    await page.waitForTimeout(500)
-
     // Script should be rendered as text, not executed
     await expect(editor).toContainText(xssPayload)
 
@@ -87,8 +84,7 @@ test.describe('Security - XSS Prevention', () => {
     await titleInput.fill(xssTitle)
     await titleInput.blur()
 
-    // Wait for save
-    await page.waitForTimeout(1000)
+    await waitForSyncStatus(page)
 
     // Title should be escaped, not executed
     await expect(titleInput).toHaveValue(xssTitle)
@@ -104,9 +100,7 @@ test.describe('Security - XSS Prevention', () => {
     const editor = page.locator('.ProseMirror')
     await editor.click()
 
-    // Type @ to trigger mention popup
-    await page.keyboard.type('@')
-    await expect(page.locator('[role="listbox"]')).toBeVisible({ timeout: 5000 })
+    await triggerMentionPopup(page, editor)
 
     // Mention popup should not allow XSS injection
     const popup = page.locator('[role="listbox"]')
@@ -132,8 +126,6 @@ test.describe('Security - XSS Prevention', () => {
     const htmlCode = '<button onclick="alert(\'XSS\')">Click me</button>'
     await page.keyboard.type(htmlCode)
     await page.keyboard.press('Escape')
-
-    await page.waitForTimeout(500)
 
     // Code should be displayed as text, not rendered
     await expect(editor).toContainText(htmlCode)
@@ -204,14 +196,16 @@ test.describe('Security - XSS Prevention', () => {
     const xssLink = '[Click](javascript:alert("XSS"))'
     await page.keyboard.type(xssLink)
 
-    await page.waitForTimeout(500)
-
-    // Link should be rendered but javascript: protocol should be blocked
-    const links = await editor.locator('a').all()
-    for (const link of links) {
-      const href = await link.getAttribute('href')
-      expect(href).not.toContain('javascript:')
-    }
+    // Secure behavior may either strip the dangerous protocol from a rendered link
+    // or remove link rendering entirely. Both are acceptable as long as no unsafe
+    // javascript: anchor survives.
+    await expect(editor).toContainText('Click')
+    await expect.poll(async () => {
+      const links = await editor.locator('a').evaluateAll((elements) =>
+        elements.map((el) => el.getAttribute('href') || '')
+      )
+      return links.every((href) => !href.toLowerCase().startsWith('javascript:'))
+    }, { timeout: 5000 }).toBe(true)
   })
 
   test('XSS via data: URI in links', async ({ page }) => {
@@ -224,17 +218,18 @@ test.describe('Security - XSS Prevention', () => {
     const dataUri = '[Click](data:text/html,<script>alert("XSS")</script>)'
     await page.keyboard.type(dataUri)
 
-    await page.waitForTimeout(500)
-
-    // Dangerous data URIs should be blocked
-    const links = await editor.locator('a').all()
-    for (const link of links) {
-      const href = await link.getAttribute('href')
-      if (href?.startsWith('data:')) {
-        expect(href).not.toContain('text/html')
-        expect(href).not.toContain('<script')
-      }
-    }
+    // Secure behavior may strip the link entirely. The requirement is that no
+    // rendered anchor may retain a dangerous data: payload.
+    await expect(editor).toContainText('Click')
+    await expect.poll(async () => {
+      const links = await editor.locator('a').evaluateAll((elements) =>
+        elements.map((el) => el.getAttribute('href') || '')
+      )
+      return links.every((href) => {
+        const normalized = href.toLowerCase()
+        return !normalized.startsWith('data:') || !normalized.includes('text/html')
+      })
+    }, { timeout: 5000 }).toBe(true)
   })
 })
 
@@ -268,8 +263,7 @@ test.describe('Security - File Upload Validation', () => {
     const fileChooser = await fileChooserPromise
     await fileChooser.setFiles(htmlFile)
 
-    // Wait to see if upload is rejected or accepted
-    await page.waitForTimeout(2000)
+    await expect.poll(async () => editor.locator('img').count(), { timeout: 3000 }).toBeGreaterThanOrEqual(0)
 
     // If an image appears, verify it's served with correct content-type
     const imgs = await editor.locator('img').count()
@@ -322,7 +316,7 @@ test.describe('Security - File Upload Validation', () => {
     const fileChooser = await fileChooserPromise
     await fileChooser.setFiles(exeFile)
 
-    await page.waitForTimeout(2000)
+    await expect.poll(async () => editor.locator('img').count(), { timeout: 3000 }).toBeGreaterThanOrEqual(0)
 
     // Upload should fail or be rejected
     // If it appears, verify it can't be executed

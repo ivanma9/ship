@@ -557,5 +557,34 @@ describe('Document Visibility', () => {
       expect(res.body.documents).toHaveLength(1);
       expect(res.body.documents[0].title).toBe('Searchable Private Doc');
     });
+
+    it('preserves separate people and documents buckets during visibility filtering', async () => {
+      await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, content)
+         VALUES ($1, 'person', 'Searchable Person', '{}')`,
+        [testWorkspaceId]
+      );
+      await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by)
+         VALUES ($1, 'wiki', 'Searchable Private Doc', 'private', $2)`,
+        [testWorkspaceId, user1Id]
+      );
+
+      const res = await request(app)
+        .get('/api/search/mentions?q=Searchable')
+        .set('Cookie', adminSessionCookie);
+
+      expect(res.status).toBe(200);
+      expect(res.body.people).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'Searchable Person', document_type: 'person' }),
+        ])
+      );
+      expect(res.body.documents).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ title: 'Searchable Private Doc', document_type: 'wiki' }),
+        ])
+      );
+    });
   });
 });

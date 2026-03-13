@@ -67,12 +67,13 @@
 
 ### Edge Cases
 
-- Describe boundary conditions, invalid inputs, missing data, concurrent edits, and
-  degraded dependency behavior relevant to the feature.
-- State the expected fallback or user-visible error behavior for each critical edge
-  case.
-- For UI changes, include keyboard/focus edge cases and any accessibility-specific
-  failure mode.
+<!--
+  ACTION REQUIRED: The content in this section represents placeholders.
+  Fill them out with the right edge cases.
+-->
+
+- What happens when [boundary condition]?
+- How does system handle [error scenario]?
 
 ## Requirements *(mandatory)*
 
@@ -112,22 +113,3 @@
 - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
 - **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
-
-## Engineering Quality Gates *(mandatory)*
-
-### Required Evidence
-
-- **QG-001 Type Safety**: Define the contracts, shared types, and validation
-  boundaries affected by this feature.
-- **QG-002 Bundle Size**: If `web/` is touched, state expected bundle impact and any
-  code-splitting or dependency tradeoffs.
-- **QG-003 API Response Time**: If API behavior changes, state the target latency and
-  measurement approach.
-- **QG-004 Database Query Efficiency**: If persistence behavior changes, identify the
-  queries, expected cardinality, and indexing or batching considerations.
-- **QG-005 Test Coverage and Quality**: List the automated tests required for the
-  primary flow and at least one failure or edge path.
-- **QG-006 Runtime Errors and Edge Cases**: Summarize the main failure modes and the
-  expected recovery or messaging behavior.
-- **QG-007 Accessibility Compliance**: For UI changes, define keyboard access, focus
-  behavior, semantics, and verification approach.

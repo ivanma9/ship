@@ -1,4 +1,5 @@
 import { expect, test, Page } from './fixtures/isolated-env';
+import { waitForEditorReady } from './fixtures/test-helpers';
 
 async function login(page: Page) {
   await page.goto('/login');
@@ -13,6 +14,7 @@ async function createNewDocument(page: Page) {
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: /new document/i }).first().click();
   await page.waitForURL(/\/documents\/[a-f0-9-]+/, { timeout: 10000 });
+  await waitForEditorReady(page);
 }
 
 test('stays on the active document during transient reconnect turbulence', async ({ page, context }) => {
@@ -48,5 +50,5 @@ test('stays on the active document during transient reconnect turbulence', async
 
   await page.reload();
   await expect(page).toHaveURL(currentUrl);
-  await expect(page.locator('textarea[placeholder="Untitled"]')).toBeVisible();
+  await waitForEditorReady(page);
 });

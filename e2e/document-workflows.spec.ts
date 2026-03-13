@@ -11,6 +11,7 @@
  */
 
 import { test, expect, Page } from './fixtures/isolated-env'
+import { waitForSyncStatus } from './fixtures/test-helpers'
 
 // Tests run in isolated containers with fresh database per worker
 
@@ -49,8 +50,7 @@ async function createIssue(page: Page, title: string) {
   // Set title and wait for save indicator
   const titleInput = page.getByPlaceholder('Untitled')
   await titleInput.fill(title)
-  // Wait for title to be saved
-  await page.waitForTimeout(1000)
+  await waitForSyncStatus(page)
 }
 
 // =============================================================================
@@ -69,18 +69,15 @@ test.describe('Issue Program Assignment', () => {
 
     // Find and click the Programs button (MultiAssociationChips component in properties sidebar)
     // Use "Add program..." text to distinguish from nav sidebar icon
-    const programsButton = page.getByText('Add program...')
+    const programsButton = page.getByRole('button', { name: 'Programs' }).last()
     await expect(programsButton).toBeVisible({ timeout: 10000 })
     await programsButton.click()
 
-    // Wait for dropdown and select Ship Core
-    await page.waitForTimeout(500)
-    const shipCoreOption = page.getByText('Ship Core', { exact: true })
+    const shipCoreOption = page.locator('button').filter({ hasText: 'Ship Core' }).last()
     await expect(shipCoreOption).toBeVisible({ timeout: 5000 })
     await shipCoreOption.click()
 
-    // Verify program chip is added (look for chip with the program name)
-    await expect(page.locator('span').filter({ hasText: 'Ship Core' })).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('button', { name: 'Remove Ship Core' })).toBeVisible({ timeout: 5000 })
   })
 })
 
@@ -100,24 +97,24 @@ test.describe('Issue Week Assignment', () => {
 
     // Assign to program first (MultiAssociationChips component in properties sidebar)
     // Use "Add program..." text to distinguish from nav sidebar icon
-    const programsButton = page.getByText('Add program...')
+    const programsButton = page.getByRole('button', { name: 'Programs' }).last()
     await programsButton.click()
-    await page.waitForTimeout(500)
-    await page.getByText('Ship Core', { exact: true }).click()
-    await expect(page.locator('span').filter({ hasText: 'Ship Core' })).toBeVisible({ timeout: 5000 })
+    const shipCoreOption = page.locator('button').filter({ hasText: 'Ship Core' }).last()
+    await expect(shipCoreOption).toBeVisible({ timeout: 5000 })
+    await shipCoreOption.click()
+    await expect(page.getByRole('button', { name: 'Remove Ship Core' })).toBeVisible({ timeout: 5000 })
 
     // Add estimate (required for sprint)
     const estimateInput = page.getByRole('spinbutton', { name: /estimate/i })
     await estimateInput.click()
     await estimateInput.clear()
     await estimateInput.pressSequentially('4', { delay: 100 })
-    await page.waitForTimeout(1000) // Wait for debounced save and sprints to load
+    await waitForSyncStatus(page)
 
     // Assign to sprint
     const sprintCombobox = page.getByRole('combobox', { name: 'Week' })
     await expect(sprintCombobox).toBeVisible({ timeout: 10000 })
     await sprintCombobox.click()
-    await page.waitForTimeout(500)
 
     // Select first available sprint
     const sprintOption = page.locator('[cmdk-item]').filter({ hasText: /Week \d+/ }).first()

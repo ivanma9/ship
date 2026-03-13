@@ -1,12 +1,13 @@
 <!--
 Sync Impact Report
-Version change: template -> 1.0.0
+Version change: 1.0.0 -> 1.1.0
 Modified principles:
 - Template Principle 1 -> I. Type Safety Audit
 - Template Principle 2 -> II. Bundle Size Audit
 - Template Principle 3 -> III. API Response Time
 - Template Principle 4 -> IV. Database Query Efficiency
 - Template Principle 5 -> V. Test Coverage and Quality
+- V. Test Coverage and Quality -> V. Test Coverage and Quality (paired before/after evidence requirement)
 - Added VI. Runtime Errors and Edge Cases
 - Added VII. Accessibility Compliance
 Added sections:
@@ -15,11 +16,11 @@ Added sections:
 Removed sections:
 - None
 Templates requiring updates:
-- ✅ updated /Users/ivanma/Desktop/gauntlet/ShipShape/ship/ship/.specify/templates/constitution-template.md
-- ✅ updated /Users/ivanma/Desktop/gauntlet/ShipShape/ship/ship/.specify/templates/plan-template.md
-- ✅ updated /Users/ivanma/Desktop/gauntlet/ShipShape/ship/ship/.specify/templates/spec-template.md
-- ✅ updated /Users/ivanma/Desktop/gauntlet/ShipShape/ship/ship/.specify/templates/tasks-template.md
-- ⚠ pending /Users/ivanma/Desktop/gauntlet/ShipShape/ship/ship/.specify/templates/commands/*.md (directory not present in this worktree)
+- ✅ reviewed /Users/ivanma/Desktop/gauntlet/ShipShape/ship/.specify/templates/constitution-template.md (no change required for this amendment)
+- ✅ reviewed /Users/ivanma/Desktop/gauntlet/ShipShape/ship/.specify/templates/plan-template.md (constitution check already consumes constitution gates)
+- ✅ reviewed /Users/ivanma/Desktop/gauntlet/ShipShape/ship/.specify/templates/spec-template.md (no change required for this amendment)
+- ✅ reviewed /Users/ivanma/Desktop/gauntlet/ShipShape/ship/.specify/templates/tasks-template.md (no change required for this amendment)
+- ⚠ pending /Users/ivanma/Desktop/gauntlet/ShipShape/ship/.specify/templates/commands/*.md (directory not present in this worktree)
 Follow-up TODOs:
 - None
 -->
@@ -157,13 +158,23 @@ workflows, sync behavior, and API contracts before release.
 - Relevant test suites MUST pass for the changed area.
 - New or changed code paths MUST have direct test coverage for the primary path and
   at least one failure or edge path.
+- Any change that claims measurable improvement to coverage, reliability, or another
+  audited quality metric MUST publish paired before and after evidence using the
+  same command or measurement method on both sides of the comparison.
 - Flaky tests introduced by the change are unacceptable; reruns MUST not be the
   validation strategy.
 - **Review/PR acceptance criteria**
 - PRs MUST describe what was tested, at which layer, and what regression would fail
   if the change broke.
+- PRs or linked durable artifacts MUST identify the canonical before snapshot
+  document and the after snapshot document whenever a measurable quality metric is
+  being improved.
 - Reviewers MUST reject coverage that asserts implementation details without checking
   user-visible or contract-visible behavior.
+- When an older failing test is changed instead of the product behavior, the change
+  MUST be justified by completed failure analysis showing the test asserted the wrong
+  contract. For pre-March 9, 2026 tests, that rationale MUST be recorded in
+  `ERROR_ANALYSIS.md` before merge.
 - **Exception policy**
 - Approver: engineering lead for the touched area.
 - Expiration: exception MUST expire within 7 calendar days and MUST be linked to a
@@ -240,6 +251,10 @@ presentation.
 - Evidence for type safety, bundle impact, latency, query efficiency, testing,
   runtime handling, and accessibility MUST be attached to the PR or linked from it in
   durable project artifacts.
+- When work changes a measurable quality metric, the durable artifact set MUST
+  include both a before snapshot and an after snapshot, and both snapshots MUST use
+  the same measurement method so the delta is reviewable without extra
+  interpretation.
 
 ## Review Workflow
 
@@ -269,4 +284,4 @@ presentation.
 - Runtime development guidance remains anchored in `AGENTS.md` and the architecture
   docs under `docs/`.
 
-**Version**: 1.0.0 | **Ratified**: 2026-03-11 | **Last Amended**: 2026-03-11
+**Version**: 1.1.0 | **Ratified**: 2026-03-11 | **Last Amended**: 2026-03-12

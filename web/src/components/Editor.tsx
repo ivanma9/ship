@@ -50,6 +50,7 @@ interface EditorProps {
   userName: string;
   userColor?: string;
   onTitleChange?: (title: string) => void;
+  onTitleBlur?: (title: string) => void;
   initialTitle?: string;
   /** Whether the title is read-only (e.g., for weekly plans/retros with computed titles) */
   titleReadOnly?: boolean;
@@ -184,6 +185,7 @@ export function Editor({
   userName,
   userColor,
   onTitleChange,
+  onTitleBlur,
   initialTitle = 'Untitled',
   titleReadOnly = false,
   onBack,
@@ -926,6 +928,10 @@ export function Editor({
     onTitleChange?.(newTitle);
   }, [onTitleChange]);
 
+  const handleTitleBlur = useCallback((e: React.FocusEvent<HTMLTextAreaElement>) => {
+    onTitleBlur?.(e.target.value);
+  }, [onTitleBlur]);
+
   return (
     <div className="flex h-full flex-col">
       {/* Compact header - breadcrumb, title, status, presence all in one row */}
@@ -1041,6 +1047,7 @@ export function Editor({
               ref={titleInputRef}
               value={title}
               onChange={titleReadOnly ? undefined : handleTitleChange}
+              onBlur={titleReadOnly ? undefined : handleTitleBlur}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();

@@ -54,6 +54,18 @@ export function UnifiedDocumentPage() {
         if (response.status === 404) {
           throw new Error('Document not found');
         }
+        if (response.status === 403) {
+          let message = 'Access denied';
+          try {
+            const data = await response.json();
+            if (data?.error?.message) {
+              message = data.error.message;
+            }
+          } catch {
+            // ignore JSON parse failures and fall back to generic message
+          }
+          throw new Error(message);
+        }
         throw new Error('Failed to fetch document');
       }
       return response.json();
@@ -61,6 +73,13 @@ export function UnifiedDocumentPage() {
     enabled: !!id,
     retry: false,
   });
+
+  useEffect(() => {
+    if (!error) return;
+    if (error.message.toLowerCase().includes('revoked') || error.message.toLowerCase().includes('access denied')) {
+      navigate('/docs', { replace: true });
+    }
+  }, [error, navigate]);
 
   // Sync current document context for rail highlighting
   useEffect(() => {
@@ -280,17 +299,6 @@ export function UnifiedDocumentPage() {
     },
     onError: (err, _variables, context) => {
       if (!context?.documentId) {
-        return;
-      }
-
-      const requestError = err as RequestError;
-
-      if (requestError.status === 409 && requestError.currentTitle && requestError.currentUpdatedAt) {
-        queryClient.setQueryData(['document', context.documentId], (current: Record<string, unknown> | undefined) => ({
-          ...(context.previousDocument || current || {}),
-          title: requestError.currentTitle,
-          updated_at: requestError.currentUpdatedAt,
-        }));
         return;
       }
 

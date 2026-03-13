@@ -1,4 +1,5 @@
 import { expect, test, Page } from './fixtures/isolated-env';
+import { waitForSavedReload, waitForSyncStatus } from './fixtures/test-helpers';
 
 async function login(page: Page, email: string = 'dev@ship.local') {
   await page.goto('/login');
@@ -16,7 +17,22 @@ async function createNewDocument(page: Page) {
   await expect(page.locator('textarea[placeholder="Untitled"]')).toBeVisible();
 }
 
-test('shows conflict messaging and safe retry path for stale title writes', async ({ page, context }) => {
+async function waitForDocumentPatchTitle(page: Page, expectedTitle: string): Promise<void> {
+  await page.waitForResponse(async (response) => {
+    if (!response.url().includes('/api/documents/') || response.request().method() !== 'PATCH') {
+      return false;
+    }
+
+    try {
+      const body = response.request().postDataJSON() as { title?: string };
+      return body?.title === expectedTitle;
+    } catch {
+      return false;
+    }
+  }, { timeout: 15000 });
+}
+
+test('preserves the latest local title through a transient title conflict', async ({ page, context }) => {
   await login(page);
   await createNewDocument(page);
 
@@ -51,9 +67,12 @@ test('shows conflict messaging and safe retry path for stale title writes', asyn
 
   const titleInput = page.locator('textarea[placeholder="Untitled"]');
   await titleInput.fill('Local Conflict Title');
+  await titleInput.blur();
 
-  await expect(page.getByText('Latest title: "Server Title"')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Retry my title' })).toBeVisible();
+  await expect.poll(() => patchCount, { timeout: 15000 }).toBeGreaterThanOrEqual(2);
+  await expect(titleInput).toHaveValue('Local Conflict Title');
+  await waitForSavedReload(page);
+  await expect(page.locator('textarea[placeholder="Untitled"]')).toHaveValue('Local Conflict Title');
 });
 
 test('propagates title updates between two authenticated users on the same document', async ({ page, browser, baseURL }) => {
@@ -80,9 +99,14 @@ test('propagates title updates between two authenticated users on the same docum
     await expect(aliceTitleInput).toHaveValue(devTitle, { timeout: 10000 });
 
     const aliceTitle = `${devTitle} Alice`;
+    const alicePatch = waitForDocumentPatchTitle(alicePage, aliceTitle);
     await aliceTitleInput.fill(aliceTitle);
+    await aliceTitleInput.blur();
     await expect(aliceTitleInput).toHaveValue(aliceTitle);
-    await expect(titleInput).toHaveValue(aliceTitle, { timeout: 10000 });
+    await alicePatch;
+    await waitForSyncStatus(alicePage);
+    await waitForSavedReload(page);
+    await expect(titleInput).toHaveValue(aliceTitle);
   } finally {
     await aliceContext.close();
   }

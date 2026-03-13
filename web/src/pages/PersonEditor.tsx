@@ -177,6 +177,11 @@ export function PersonEditorPage() {
     throttledTitleSave(title);
   }, [throttledTitleSave]);
 
+  const handleTitleBlur = useCallback((title: string) => {
+    latestLocalTitleRef.current = title || 'Untitled';
+    void throttledTitleSave.flush(title);
+  }, [throttledTitleSave]);
+
   const handleRetryTitleSave = useCallback(async () => {
     if (!id || !titleConflict) return;
 
@@ -226,6 +231,7 @@ export function PersonEditorPage() {
       userName={user?.name || 'Anonymous'}
       initialTitle={person.title}
       onTitleChange={handleTitleChange}
+      onTitleBlur={handleTitleBlur}
       onBack={() => navigate('/team/directory')}
       backLabel="Team Directory"
       roomPrefix="person"

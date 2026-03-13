@@ -1,4 +1,103 @@
+import type { Page } from '@playwright/test'
 import { test, expect } from './fixtures/isolated-env'
+
+async function getCsrfToken(page: Page): Promise<string> {
+  const response = await page.request.get('/api/csrf-token')
+  expect(response.ok()).toBe(true)
+  const data = await response.json()
+  return data.token
+}
+
+async function getCurrentUserPersonId(page: Page): Promise<string> {
+  const meResponse = await page.request.get('/api/auth/me')
+  expect(meResponse.ok()).toBe(true)
+  const meData = await meResponse.json()
+  const userId = meData.data.user.id
+
+  const docsResponse = await page.request.get('/api/documents?document_type=person')
+  expect(docsResponse.ok()).toBe(true)
+  const docs = await docsResponse.json()
+  const person = docs.find(
+    (doc: { id: string; properties?: { user_id?: string } }) => doc.properties?.user_id === userId,
+  )
+  expect(person, 'Logged-in user should have a person document').toBeTruthy()
+  return person.id
+}
+
+async function ensureHeatmapStatusData(page: Page): Promise<void> {
+  const csrfToken = await getCsrfToken(page)
+  const personId = await getCurrentUserPersonId(page)
+  const gridResponse = await page.request.get('/api/team/accountability-grid-v3')
+  expect(gridResponse.ok()).toBe(true)
+  const gridData = await gridResponse.json()
+  const sprintNumber = gridData.currentSprintNumber
+  expect(typeof sprintNumber).toBe('number')
+
+  const uniqueKey = `heatmap-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+
+  const programResponse = await page.request.post('/api/documents', {
+    headers: { 'x-csrf-token': csrfToken },
+    data: {
+      title: `${uniqueKey}-program`,
+      document_type: 'program',
+    },
+  })
+  expect(programResponse.ok()).toBe(true)
+  const program = await programResponse.json()
+
+  const projectResponse = await page.request.post('/api/documents', {
+    headers: { 'x-csrf-token': csrfToken },
+    data: {
+      title: `${uniqueKey}-project`,
+      document_type: 'project',
+      belongs_to: [{ id: program.id, type: 'program' }],
+    },
+  })
+  expect(projectResponse.ok()).toBe(true)
+  const project = await projectResponse.json()
+
+  const assignResponse = await page.request.post('/api/team/assign', {
+    headers: { 'x-csrf-token': csrfToken },
+    data: {
+      personId,
+      projectId: project.id,
+      sprintNumber,
+    },
+  })
+  expect(assignResponse.ok()).toBe(true)
+
+  const planResponse = await page.request.post('/api/weekly-plans', {
+    headers: { 'x-csrf-token': csrfToken },
+    data: {
+      person_id: personId,
+      project_id: project.id,
+      week_number: sprintNumber,
+    },
+  })
+  expect(planResponse.ok()).toBe(true)
+
+  const retroResponse = await page.request.post('/api/weekly-retros', {
+    headers: { 'x-csrf-token': csrfToken },
+    data: {
+      person_id: personId,
+      project_id: project.id,
+      week_number: sprintNumber,
+    },
+  })
+  expect(retroResponse.ok()).toBe(true)
+}
+
+async function waitForHeatmapButtons(page: Page) {
+  await expect(page.getByText('Program / Person')).toBeVisible({ timeout: 10000 })
+  await expect.poll(async () => page.getByRole('button', { name: /Weekly Plan/ }).count(), {
+    timeout: 15000,
+    intervals: [250, 500, 1000],
+  }).toBeGreaterThan(0)
+  await expect.poll(async () => page.getByRole('button', { name: /Weekly Retro/ }).count(), {
+    timeout: 15000,
+    intervals: [250, 500, 1000],
+  }).toBeGreaterThan(0)
+}
 
 test.describe('Status Overview Heatmap', () => {
   test.beforeEach(async ({ page }) => {
@@ -67,17 +166,13 @@ test.describe('Status Overview Heatmap', () => {
   })
 
   test('displays split cells for plan/retro status', async ({ page }) => {
+    await ensureHeatmapStatusData(page)
     await page.goto('/team/status')
     await page.waitForLoadState('networkidle')
 
-    // Wait for heatmap to load
-    await expect(page.getByText('Program / Person')).toBeVisible({ timeout: 10000 })
+    // Heatmap rows can render before actionable weekly cells settle under grouped load.
+    await waitForHeatmapButtons(page)
 
-    // People are visible directly, should see plan/retro buttons
-    // Wait for any person to be visible
-    await expect(page.getByText(/Dev User|Alice Chen|Grace Lee/).first()).toBeVisible({ timeout: 5000 })
-
-    // Should see plan/retro cell buttons with status tooltips
     const planButton = page.getByRole('button', { name: /Weekly Plan/ }).first()
     await expect(planButton).toBeVisible({ timeout: 5000 })
 
@@ -86,14 +181,11 @@ test.describe('Status Overview Heatmap', () => {
   })
 
   test('clicking plan cell navigates to weekly plan document', async ({ page }) => {
+    await ensureHeatmapStatusData(page)
     await page.goto('/team/status')
     await page.waitForLoadState('networkidle')
 
-    // Wait for heatmap to load
-    await expect(page.getByText('Program / Person')).toBeVisible({ timeout: 10000 })
-
-    // Wait for people to appear (visible directly, no expansion needed)
-    await expect(page.getByText(/Dev User|Alice Chen|Grace Lee/).first()).toBeVisible({ timeout: 5000 })
+    await waitForHeatmapButtons(page)
 
     // Click a plan cell (any week)
     const planButton = page.getByRole('button', { name: /Weekly Plan/ }).first()
@@ -107,14 +199,11 @@ test.describe('Status Overview Heatmap', () => {
   })
 
   test('clicking retro cell navigates to weekly retro document', async ({ page }) => {
+    await ensureHeatmapStatusData(page)
     await page.goto('/team/status')
     await page.waitForLoadState('networkidle')
 
-    // Wait for heatmap to load
-    await expect(page.getByText('Program / Person')).toBeVisible({ timeout: 10000 })
-
-    // Wait for people to appear (visible directly, no expansion needed)
-    await expect(page.getByText(/Dev User|Alice Chen|Grace Lee/).first()).toBeVisible({ timeout: 5000 })
+    await waitForHeatmapButtons(page)
 
     // Click a retro cell (any week)
     const retroButton = page.getByRole('button', { name: /Weekly Retro/ }).first()
