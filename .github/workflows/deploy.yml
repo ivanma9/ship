@@ -44,12 +44,15 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
+      - name: Link Railway project
+        run: |
+          mkdir -p .railway
+          echo '{"projectId":"${{ secrets.RAILWAY_PROJECT_ID }}","environmentName":"production"}' > .railway/config.json
+
       - name: Deploy to Railway
         run: railway up --detach --service web
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
-          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
-          RAILWAY_ENVIRONMENT: production
 
   deploy-frontend:
     name: Deploy Frontend to Vercel
@@ -80,6 +83,13 @@ jobs:
 
       - name: Install Vercel CLI
         run: npm install -g vercel
+
+      - name: Build for Vercel
+        run: vercel build --prod --token ${{ secrets.VERCEL_TOKEN }}
+        working-directory: web
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Deploy to Vercel (production)
         run: vercel deploy --prod --prebuilt --token ${{ secrets.VERCEL_TOKEN }}
