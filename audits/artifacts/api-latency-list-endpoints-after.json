@@ -1,0 +1,91 @@
+{
+  "captured_at": "2026-03-12T00:00:00Z",
+  "branch": "005-api-latency-list-endpoints",
+  "seeded_volume": {
+    "documents": 257,
+    "issues": 104,
+    "users": 11,
+    "sprints": 35
+  },
+  "environment": {
+    "api": "http://127.0.0.1:3297",
+    "db": "local PostgreSQL (ship_master)",
+    "auth": "session cookie (E2E_TEST=1)",
+    "tool": "ApacheBench (ab)"
+  },
+  "optimizations_applied": [
+    "Migration 038: idx_documents_list_active_type - composite partial index on (workspace_id, document_type, position, created_at) WHERE archived/deleted IS NULL",
+    "Migration 038: idx_documents_person_workspace_user - composite partial index on (workspace_id, properties->>'user_id') WHERE document_type = 'person'",
+    "Removed d.content from /api/issues list SELECT (not consumed by list UI)"
+  ],
+  "explain_improvements": {
+    "wiki": "Nested index scan on idx_documents_workspace_id (24 buffer hits, 250 rows filtered) → Index Scan on idx_documents_list_active_type (7 buffer hits, 0 rows filtered). Execution: 1.4ms → 0.6ms",
+    "issues": "Nested Loop Left Join on person_doc (2527 buffer hits, 1040 extra rows) → Hash Left Join (32 buffer hits, single pass). Execution: 2.78ms → 1.25ms"
+  },
+  "results": [
+    {
+      "endpoint": "/api/documents?type=wiki",
+      "tool": "ab",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 2,
+      "p95_ms": 3,
+      "p99_ms": 4,
+      "non_2xx": 0
+    },
+    {
+      "endpoint": "/api/documents?type=wiki",
+      "tool": "ab",
+      "concurrency": 25,
+      "requests": 500,
+      "p50_ms": 3,
+      "p95_ms": 5,
+      "p99_ms": 6,
+      "non_2xx": 0
+    },
+    {
+      "endpoint": "/api/documents?type=wiki",
+      "tool": "ab",
+      "concurrency": 50,
+      "requests": 1000,
+      "p50_ms": 4,
+      "p95_ms": 8,
+      "p99_ms": 11,
+      "non_2xx": 0,
+      "target_ms": 98,
+      "passed": true
+    },
+    {
+      "endpoint": "/api/issues",
+      "tool": "ab",
+      "concurrency": 10,
+      "requests": 200,
+      "p50_ms": 1,
+      "p95_ms": 2,
+      "p99_ms": 3,
+      "non_2xx": 0
+    },
+    {
+      "endpoint": "/api/issues",
+      "tool": "ab",
+      "concurrency": 25,
+      "requests": 500,
+      "p50_ms": 2,
+      "p95_ms": 6,
+      "p99_ms": 7,
+      "non_2xx": 0
+    },
+    {
+      "endpoint": "/api/issues",
+      "tool": "ab",
+      "concurrency": 50,
+      "requests": 1000,
+      "p50_ms": 4,
+      "p95_ms": 7,
+      "p99_ms": 7,
+      "non_2xx": 0,
+      "target_ms": 84,
+      "passed": true
+    }
+  ]
+}

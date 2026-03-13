@@ -49,14 +49,34 @@ export const BaseDocumentSchema = z.object({
 registry.register('Document', BaseDocumentSchema);
 
 // ============== Document List Item (lighter response) ==============
+// Matches the actual GET /documents list response: no content/yjs_state,
+// includes flattened property fields for backwards compatibility.
 
 export const DocumentListItemSchema = z.object({
   id: UuidSchema,
+  workspace_id: UuidSchema,
   title: z.string(),
   document_type: DocumentTypeSchema,
   parent_id: UuidSchema.nullable().optional(),
+  position: z.number().nullable().optional(),
+  ticket_number: z.number().nullable().optional(),
+  properties: z.record(z.unknown()).openapi({
+    description: 'Raw type-specific properties object',
+  }),
   created_at: DateTimeSchema,
   updated_at: DateTimeSchema,
+  created_by: UuidSchema.nullable().optional(),
+  visibility: z.enum(['private', 'workspace']).openapi({
+    description: 'Document visibility scope',
+  }),
+  // Flattened property fields for backwards compatibility
+  state: z.string().nullable().optional(),
+  priority: z.string().nullable().optional(),
+  estimate: z.number().nullable().optional(),
+  assignee_id: UuidSchema.nullable().optional(),
+  source: z.string().nullable().optional(),
+  prefix: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
 }).openapi('DocumentListItem');
 
 registry.register('DocumentListItem', DocumentListItemSchema);

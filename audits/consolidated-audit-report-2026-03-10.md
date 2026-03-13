@@ -398,6 +398,22 @@ Metric format for this table: `(ab/k6)` in milliseconds.
 4. Record before/after P95 deltas in this file.
 5. If either target is missed, apply pagination/default limits and rerun.
 
+### Optimisation Results (Branch: 005-api-latency-list-endpoints, 2026-03-12)
+
+Both targets met without pagination/default-limit fallback.
+
+| Endpoint | c50 P95 Before | c50 P95 After | Delta | Target | Status |
+|----------|---------------|---------------|-------|--------|--------|
+| `/api/documents?type=wiki` | 123ms | **8ms** | -94% | ≤98ms | ✅ PASS |
+| `/api/issues` | 105ms | **7ms** | -93% | ≤84ms | ✅ PASS |
+
+**Changes applied:**
+- Migration `038_api_list_latency_indexes.sql`: two new partial indexes (`idx_documents_list_active_type`, `idx_documents_person_workspace_user`); buffer hits reduced 97% for issues query (2527 → 32).
+- Removed `content` column from `/api/issues` list SELECT (content only needed on detail GET).
+- OpenAPI schemas (`documents.ts`, `issues.ts`) updated to reflect actual list response shape.
+
+Full before/after artifacts: `audits/artifacts/api-latency-list-endpoints-before.json`, `audits/artifacts/api-latency-list-endpoints-after.json`
+
 ---
 
 ## 4. Database Query Efficiency

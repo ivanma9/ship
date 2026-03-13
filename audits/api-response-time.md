@@ -88,3 +88,51 @@ Metric format for this table: `(ab/k6)` in milliseconds.
 4. Record before/after P95 deltas in this file.
 5. If either target is missed, apply pagination/default limits and rerun.
 
+## Optimization Results (Branch: 005-api-latency-list-endpoints, 2026-03-12)
+
+### Changes Applied
+
+1. **Migration 038** (`038_api_list_latency_indexes.sql`):
+   - `idx_documents_list_active_type`: composite partial index on `(workspace_id, document_type, position ASC, created_at DESC) WHERE archived_at IS NULL AND deleted_at IS NULL` — enables planner to use Index Scan instead of filtering 250+ rows.
+   - `idx_documents_person_workspace_user`: composite partial index on `(workspace_id, (properties->>'user_id')) WHERE document_type = 'person'` — converts Nested Loop Join (104 × 11 scans = 1040 extra rows) to Hash Join (single pass, 32 buffer hits vs 2527).
+2. **`/api/issues` list query**: Removed `d.content` from SELECT (content is only needed for individual issue detail view, not list view).
+
+### EXPLAIN ANALYZE Evidence
+
+| Query | Before | After |
+|-------|--------|-------|
+| Wiki: execution time | 1.4ms | 0.6ms |
+| Wiki: buffer hits | 24 | 7 |
+| Issues: execution time | 2.78ms | 1.25ms |
+| Issues: buffer hits | 2527 | 32 |
+
+### Before / After Benchmark (AB, local PostgreSQL, seeded data)
+
+| Endpoint | Concurrency | Before P95 (ms) | After P95 (ms) | Delta | Target | Pass |
+|----------|-------------|-----------------|----------------|-------|--------|------|
+| `/api/documents?type=wiki` | c10 | 35 | 3 | -91% | — | — |
+| `/api/documents?type=wiki` | c25 | 65 | 5 | -92% | — | — |
+| `/api/documents?type=wiki` | c50 | 123 | 8 | **-94%** | ≤98ms | ✅ PASS |
+| `/api/issues` | c10 | 28 | 2 | -93% | — | — |
+| `/api/issues` | c25 | 55 | 6 | -89% | — | — |
+| `/api/issues` | c50 | 105 | 7 | **-93%** | ≤84ms | ✅ PASS |
+
+Fallback pagination/default limits were **not needed** — direct DB and payload optimizations met both targets.
+
+Artifacts: `audits/artifacts/api-latency-list-endpoints-before.json`, `audits/artifacts/api-latency-list-endpoints-after.json`
+
+
+### Rollout / Rollback
+
+**Rollout** (already deployed to branch):
+1. Migration `038_api_list_latency_indexes.sql` — apply via `pnpm db:migrate`.
+2. API change: `d.content` removed from list SELECT in `api/src/routes/issues.ts`.
+3. OpenAPI schemas updated (`documents.ts`, `issues.ts`) — no consumer changes needed.
+
+**Rollback** (if latency regression or contract issues arise):
+```sql
+DROP INDEX IF EXISTS idx_documents_list_active_type;
+DROP INDEX IF EXISTS idx_documents_person_workspace_user;
+DELETE FROM schema_migrations WHERE version = '038_api_list_latency_indexes';
+```
+Then revert the `d.content` removal in `api/src/routes/issues.ts` list query (add `d.content,` back to SELECT at line ~126) and restore previous OpenAPI schema fields.

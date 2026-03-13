@@ -983,3 +983,142 @@ describe('Documents API - Conversion', () => {
     })
   })
 })
+
+describe('Documents API - Wiki List (GET /api/documents?type=wiki)', () => {
+  const app = createApp()
+  const testRunId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  const testEmail = `wiki-list-${testRunId}@ship.local`
+  const testWorkspaceName = `Wiki List Test ${testRunId}`
+
+  let sessionCookie: string
+  let csrfToken: string
+  let testWorkspaceId: string
+  let testUserId: string
+
+  beforeAll(async () => {
+    const workspaceResult = await pool.query(
+      `INSERT INTO workspaces (name) VALUES ($1) RETURNING id`,
+      [testWorkspaceName]
+    )
+    testWorkspaceId = workspaceResult.rows[0].id
+
+    const userResult = await pool.query(
+      `INSERT INTO users (email, password_hash, name)
+       VALUES ($1, 'test-hash', 'Wiki List User')
+       RETURNING id`,
+      [testEmail]
+    )
+    testUserId = userResult.rows[0].id
+
+    await pool.query(
+      `INSERT INTO workspace_memberships (workspace_id, user_id, role)
+       VALUES ($1, $2, 'member')`,
+      [testWorkspaceId, testUserId]
+    )
+
+    const sessionId = crypto.randomBytes(32).toString('hex')
+    await pool.query(
+      `INSERT INTO sessions (id, user_id, workspace_id, expires_at)
+       VALUES ($1, $2, $3, now() + interval '1 hour')`,
+      [sessionId, testUserId, testWorkspaceId]
+    )
+    sessionCookie = `session_id=${sessionId}`
+
+    const csrfRes = await request(app).get('/api/csrf-token').set('Cookie', sessionCookie)
+    csrfToken = csrfRes.body.token
+    const connectSidCookie = csrfRes.headers['set-cookie']?.[0]?.split(';')[0] || ''
+    if (connectSidCookie) sessionCookie = `${sessionCookie}; ${connectSidCookie}`
+  })
+
+  afterAll(async () => {
+    await pool.query('DELETE FROM sessions WHERE user_id = $1', [testUserId])
+    await pool.query('DELETE FROM documents WHERE workspace_id = $1', [testWorkspaceId])
+    await pool.query('DELETE FROM workspace_memberships WHERE user_id = $1', [testUserId])
+    await pool.query('DELETE FROM users WHERE id = $1', [testUserId])
+    await pool.query('DELETE FROM workspaces WHERE id = $1', [testWorkspaceId])
+  })
+
+  it('returns only wiki documents when type=wiki is specified', async () => {
+    await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by)
+       VALUES ($1, 'wiki', 'A Wiki Page', 'workspace', $2),
+              ($1, 'issue', 'An Issue', 'workspace', $2)`,
+      [testWorkspaceId, testUserId]
+    )
+
+    const res = await request(app)
+      .get('/api/documents?type=wiki')
+      .set('Cookie', sessionCookie)
+
+    expect(res.status).toBe(200)
+    expect(Array.isArray(res.body)).toBe(true)
+    expect(res.body.every((d: { document_type: string }) => d.document_type === 'wiki')).toBe(true)
+    expect(res.body.some((d: { title: string }) => d.title === 'A Wiki Page')).toBe(true)
+
+    // Clean up
+    await pool.query('DELETE FROM documents WHERE workspace_id = $1', [testWorkspaceId])
+  })
+
+  it('returns expected field set (no content, no yjs_state)', async () => {
+    await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, content)
+       VALUES ($1, 'wiki', 'Field Test Wiki', 'workspace', $2, '{"type":"doc","content":[]}')`,
+      [testWorkspaceId, testUserId]
+    )
+
+    const res = await request(app)
+      .get('/api/documents?type=wiki')
+      .set('Cookie', sessionCookie)
+
+    expect(res.status).toBe(200)
+    expect(res.body.length).toBeGreaterThan(0)
+    const doc = res.body[0]
+
+    // Required fields present
+    expect(doc).toHaveProperty('id')
+    expect(doc).toHaveProperty('title')
+    expect(doc).toHaveProperty('document_type')
+    expect(doc).toHaveProperty('workspace_id')
+    expect(doc).toHaveProperty('visibility')
+    expect(doc).toHaveProperty('created_by')
+    expect(doc).toHaveProperty('created_at')
+    expect(doc).toHaveProperty('updated_at')
+    expect(doc).toHaveProperty('properties')
+
+    // Heavy fields must NOT appear in list response
+    expect(doc).not.toHaveProperty('content')
+    expect(doc).not.toHaveProperty('yjs_state')
+
+    await pool.query('DELETE FROM documents WHERE workspace_id = $1', [testWorkspaceId])
+  })
+
+  it('excludes archived and deleted wiki documents', async () => {
+    await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, archived_at)
+       VALUES ($1, 'wiki', 'Archived Wiki', 'workspace', $2, now())`,
+      [testWorkspaceId, testUserId]
+    )
+    await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, deleted_at)
+       VALUES ($1, 'wiki', 'Deleted Wiki', 'workspace', $2, now())`,
+      [testWorkspaceId, testUserId]
+    )
+    await pool.query(
+      `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by)
+       VALUES ($1, 'wiki', 'Active Wiki', 'workspace', $2)`,
+      [testWorkspaceId, testUserId]
+    )
+
+    const res = await request(app)
+      .get('/api/documents?type=wiki')
+      .set('Cookie', sessionCookie)
+
+    expect(res.status).toBe(200)
+    const titles = res.body.map((d: { title: string }) => d.title)
+    expect(titles).toContain('Active Wiki')
+    expect(titles).not.toContain('Archived Wiki')
+    expect(titles).not.toContain('Deleted Wiki')
+
+    await pool.query('DELETE FROM documents WHERE workspace_id = $1', [testWorkspaceId])
+  })
+})

@@ -1,0 +1,76 @@
+{
+  "captured_at": "2026-03-12T00:00:00Z",
+  "branch": "005-api-latency-list-endpoints",
+  "note": "Baseline from audits/api-response-time.md; plan targets derived from these values",
+  "seeded_volume": {
+    "documents": 572,
+    "issues": 104,
+    "users": 26,
+    "sprints": 35
+  },
+  "environment": {
+    "api": "http://127.0.0.1:3000",
+    "db": "local PostgreSQL",
+    "auth": "session cookie",
+    "e2e_test": true
+  },
+  "results": [
+    {
+      "endpoint": "/api/documents?type=wiki",
+      "tool": "ab",
+      "concurrency": 10,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null,
+      "non_2xx": 0,
+      "note": "Baseline run pre-optimization; exact values from audit report"
+    },
+    {
+      "endpoint": "/api/documents?type=wiki",
+      "tool": "ab",
+      "concurrency": 25,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null,
+      "non_2xx": 0
+    },
+    {
+      "endpoint": "/api/documents?type=wiki",
+      "tool": "ab",
+      "concurrency": 50,
+      "p50_ms": null,
+      "p95_ms": 123,
+      "p99_ms": null,
+      "non_2xx": 0,
+      "note": "P95 123ms from spec target baseline"
+    },
+    {
+      "endpoint": "/api/issues",
+      "tool": "ab",
+      "concurrency": 10,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null,
+      "non_2xx": 0
+    },
+    {
+      "endpoint": "/api/issues",
+      "tool": "ab",
+      "concurrency": 25,
+      "p50_ms": null,
+      "p95_ms": null,
+      "p99_ms": null,
+      "non_2xx": 0
+    },
+    {
+      "endpoint": "/api/issues",
+      "tool": "ab",
+      "concurrency": 50,
+      "p50_ms": null,
+      "p95_ms": 105,
+      "p99_ms": null,
+      "non_2xx": 0,
+      "note": "P95 105ms from spec target baseline"
+    }
+  ]
+}

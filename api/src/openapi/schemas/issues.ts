@@ -90,7 +90,9 @@ export const IssueResponseSchema = z.object({
   rejection_reason: z.string().nullable().optional().openapi({
     description: 'Reason if issue was rejected from triage',
   }),
-  content: z.record(z.unknown()).nullable(),
+  content: z.record(z.unknown()).nullable().optional().openapi({
+    description: 'TipTap JSON content. Present on detail GET, omitted from list responses.',
+  }),
   created_at: DateTimeSchema,
   updated_at: DateTimeSchema,
   created_by: UuidSchema.optional(),
