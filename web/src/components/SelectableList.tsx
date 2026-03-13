@@ -207,6 +207,13 @@ export function SelectableList<T extends { id: string }>({
                   }
                 }}
                 onRowClick={() => onItemClick?.(item)}
+                onRowKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onItemClick?.(item);
+                  }
+                }}
                 onFocus={() => selection.setFocusedId(itemId)}
                 onMouseEnter={() => {
                   setHoveredId(itemId);
@@ -250,6 +257,7 @@ interface SelectableRowProps {
   focusedColIndex: number | null;
   onCheckboxClick: (e: React.MouseEvent) => void;
   onRowClick: () => void;
+  onRowKeyDown?: (e: React.KeyboardEvent<HTMLTableRowElement>) => void;
   onFocus: () => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -267,6 +275,7 @@ function SelectableRow({
   focusedColIndex,
   onCheckboxClick,
   onRowClick,
+  onRowKeyDown,
   onFocus,
   onMouseEnter,
   onMouseLeave,
@@ -280,6 +289,7 @@ function SelectableRow({
       aria-selected={isSelected}
       tabIndex={isFocused ? 0 : -1}
       onClick={onRowClick}
+      onKeyDown={onRowKeyDown}
       onFocus={onFocus}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}

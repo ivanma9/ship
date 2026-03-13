@@ -250,7 +250,7 @@ export function IssuesList({
   const [showAllIssues, setShowAllIssues] = useState(false);
 
   // Self-fetch issues when using locked filters
-  const { data: fetchedIssues, isLoading: isFetchingIssues } = useIssuesQuery(
+  const { data: fetchedIssues, isLoading: isFetchingIssues, isError: isFetchError } = useIssuesQuery(
     shouldSelfFetch ? {
       programId: lockedProgramId,
       projectId: lockedProjectId,
@@ -1075,6 +1075,16 @@ export function IssuesList({
 
   if (loading) {
     return <IssuesListSkeleton />;
+  }
+
+  if (isFetchError) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div role="status" aria-live="polite" className="text-center">
+          <p className="text-muted">Something went wrong loading issues.</p>
+        </div>
+      </div>
+    );
   }
 
   // Program filter for toolbar (hidden when locked)
