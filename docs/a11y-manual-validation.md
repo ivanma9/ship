@@ -29,3 +29,4 @@
 | Run | Branch | Result | Violation Introduced | Notes |
 |-----|--------|--------|----------------------|-------|
 | — | — | — | — | Fill during T027/T028 |
+| Configured | 007-a11y-completion-gates | Pending CI run | N/A | CI job added to ci.yml; validates on merge |
