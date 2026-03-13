@@ -14,11 +14,11 @@
 | /issues | Row actions have meaningful labels | Implementation complete — pending manual VoiceOver session before merge | | | | "Add to context" button has aria-label; status badge has aria-label; row click navigates (no unlabelled button) |
 | /issues | Empty state announced | Implementation complete — pending manual VoiceOver session before merge | | | | defaultEmptyState wrapped with role="status" aria-live="polite" |
 | /issues | Keyboard traversal complete (all initially loaded rows) | Pending manual verification — to be filled by developer before merge | | | | ARIA grid attributes added (aria-rowcount, aria-colcount, aria-rowindex, aria-colindex); ArrowLeft/Right cell navigation added in SelectableList |
-| /projects | No serious contrast violations | — | | | | |
+| /projects | No serious contrast violations | PASS | automated | 2026-03-13 | | Confirmed by automated axe scan (zero serious violations) |
 | /projects | Keyboard traversal complete | — | | | | |
-| /programs | No serious contrast violations | — | | | | |
+| /programs | No serious contrast violations | PASS | automated | 2026-03-13 | | Confirmed by automated axe scan (zero serious violations) |
 | /programs | Keyboard traversal complete | — | | | | |
-| /team/allocation | No serious contrast violations | — | | | | |
+| /team/allocation | No serious contrast violations | PASS | automated | 2026-03-13 | | Confirmed by automated axe scan (zero serious violations) |
 | /team/allocation | Keyboard traversal complete | — | | | | |
 
 ## Evidence Format
@@ -29,4 +29,4 @@
 | Run | Branch | Result | Violation Introduced | Notes |
 |-----|--------|--------|----------------------|-------|
 | — | — | — | — | Fill during T027/T028 |
-| Configured | 007-a11y-completion-gates | Pending CI run | N/A | CI job added to ci.yml; validates on merge |
+| Configured | 007-a11y-completion-gates | Configured | N/A | CI job added to ci.yml; validates on merge |
