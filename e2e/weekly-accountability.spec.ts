@@ -86,7 +86,7 @@ test.describe('Weekly Plan API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: 101,
       },
     });
 
@@ -95,11 +95,11 @@ test.describe('Weekly Plan API', () => {
 
     expect(plan.id).toBeTruthy();
     expect(plan.document_type).toBe('weekly_plan');
-    // API returns computed title with person name (e.g., "Week 1 Plan - Dev User")
+    // API returns computed title with person name (e.g., "Week 101 Plan - Dev User")
     expect(plan.title).toMatch(/^Week \d+ Plan/)
     expect(plan.properties.person_id).toBe(personId);
     expect(plan.properties.project_id).toBe(projectId);
-    expect(plan.properties.week_number).toBe(1);
+    expect(plan.properties.week_number).toBe(101);
     expect(plan.properties.submitted_at).toBeNull();
   });
 
@@ -111,7 +111,7 @@ test.describe('Weekly Plan API', () => {
     const planData = {
       person_id: personId,
       project_id: projectId,
-      week_number: 2,
+      week_number: 102,
     };
 
     // First creation - should return 201
@@ -132,7 +132,7 @@ test.describe('Weekly Plan API', () => {
 
     // Same document should be returned
     expect(plan2.id).toBe(plan1.id);
-    expect(plan2.properties.week_number).toBe(2);
+    expect(plan2.properties.week_number).toBe(102);
   });
 
   test('GET /weekly-plans queries plans by person and project', async ({ page, apiServer }) => {
@@ -141,7 +141,7 @@ test.describe('Weekly Plan API', () => {
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Query');
 
     // Create a few plans
-    for (const weekNum of [3, 4, 5]) {
+    for (const weekNum of [103, 104, 105]) {
       await page.request.post(`${apiServer.url}/api/weekly-plans`, {
         headers: { 'x-csrf-token': csrfToken },
         data: {
@@ -178,7 +178,7 @@ test.describe('Weekly Plan API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 6,
+        week_number: 106,
       },
     });
     const created = await createResponse.json();
@@ -189,7 +189,7 @@ test.describe('Weekly Plan API', () => {
     const plan = await getResponse.json();
 
     expect(plan.id).toBe(created.id);
-    expect(plan.properties.week_number).toBe(6);
+    expect(plan.properties.week_number).toBe(106);
   });
 
   test('POST /weekly-plans returns 404 for non-existent person', async ({ page, apiServer }) => {
@@ -201,7 +201,7 @@ test.describe('Weekly Plan API', () => {
       data: {
         person_id: '00000000-0000-0000-0000-000000000000',
         project_id: projectId,
-        week_number: 1,
+        week_number: 201,
       },
     });
 
@@ -219,7 +219,7 @@ test.describe('Weekly Plan API', () => {
       data: {
         person_id: personId,
         project_id: '00000000-0000-0000-0000-000000000000',
-        week_number: 1,
+        week_number: 201,
       },
     });
 
@@ -241,7 +241,7 @@ test.describe('Weekly Retro API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: 201,
       },
     });
 
@@ -250,11 +250,11 @@ test.describe('Weekly Retro API', () => {
 
     expect(retro.id).toBeTruthy();
     expect(retro.document_type).toBe('weekly_retro');
-    // API returns computed title with person name (e.g., "Week 1 Retro - Dev User")
+    // API returns computed title with person name (e.g., "Week 201 Retro - Dev User")
     expect(retro.title).toMatch(/^Week \d+ Retro/)
     expect(retro.properties.person_id).toBe(personId);
     expect(retro.properties.project_id).toBe(projectId);
-    expect(retro.properties.week_number).toBe(1);
+    expect(retro.properties.week_number).toBe(201);
     expect(retro.properties.submitted_at).toBeNull();
   });
 
@@ -266,7 +266,7 @@ test.describe('Weekly Retro API', () => {
     const retroData = {
       person_id: personId,
       project_id: projectId,
-      week_number: 2,
+      week_number: 202,
     };
 
     // First creation - should return 201
@@ -287,7 +287,7 @@ test.describe('Weekly Retro API', () => {
 
     // Same document should be returned
     expect(retro2.id).toBe(retro1.id);
-    expect(retro2.properties.week_number).toBe(2);
+    expect(retro2.properties.week_number).toBe(202);
   });
 
   test('GET /weekly-retros queries retros by person and project', async ({ page, apiServer }) => {
@@ -296,7 +296,7 @@ test.describe('Weekly Retro API', () => {
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Retro Query');
 
     // Create a few retros
-    for (const weekNum of [3, 4, 5]) {
+    for (const weekNum of [203, 204, 205]) {
       await page.request.post(`${apiServer.url}/api/weekly-retros`, {
         headers: { 'x-csrf-token': csrfToken },
         data: {
@@ -333,7 +333,7 @@ test.describe('Weekly Retro API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 6,
+        week_number: 206,
       },
     });
     const created = await createResponse.json();
@@ -344,7 +344,7 @@ test.describe('Weekly Retro API', () => {
     const retro = await getResponse.json();
 
     expect(retro.id).toBe(created.id);
-    expect(retro.properties.week_number).toBe(6);
+    expect(retro.properties.week_number).toBe(206);
   });
 });
 
@@ -405,7 +405,7 @@ test.describe('Project Allocation Grid API', () => {
       data: {
         title: 'Test Sprint',
         program_id: program.id,
-        sprint_number: 1,
+        sprint_number: 240,
         owner_id: userId,
       },
     });
@@ -419,7 +419,7 @@ test.describe('Project Allocation Grid API', () => {
         properties: {
           project_id: projectId,
           assignee_ids: [personId],
-          sprint_number: 1,
+          sprint_number: 240,
         },
       },
     });
@@ -445,7 +445,7 @@ test.describe('Project Allocation Grid API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: 240,
       },
     });
     const plan = await planResponse.json();
@@ -463,10 +463,10 @@ test.describe('Project Allocation Grid API', () => {
     expect(personInGrid, 'Person should appear in allocation grid').toBeTruthy();
 
     // Person should have week 1 data
-    const week1Data = personInGrid.weeks[1];
-    if (week1Data) {
-      expect(week1Data.isAllocated).toBe(true);
-      expect(week1Data.planId).toBe(plan.id);
+    const weekData = personInGrid.weeks[240];
+    if (weekData) {
+      expect(weekData.isAllocated).toBe(true);
+      expect(weekData.planId).toBe(plan.id);
     }
   });
 
@@ -498,7 +498,7 @@ test.describe('Content Version History API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: 301,
       },
     });
     const plan = await createResponse.json();
@@ -528,7 +528,7 @@ test.describe('Content Version History API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: 401,
       },
     });
     const retro = await createResponse.json();
@@ -587,7 +587,7 @@ test.describe('Weekly Plan/Retro Document Navigation', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: 501,
       },
     });
     const plan = await createResponse.json();
@@ -613,7 +613,7 @@ test.describe('Weekly Plan/Retro Document Navigation', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: 601,
       },
     });
     const retro = await createResponse.json();

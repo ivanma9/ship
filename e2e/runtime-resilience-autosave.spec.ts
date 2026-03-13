@@ -1,4 +1,5 @@
 import { expect, test, Page } from './fixtures/isolated-env';
+import { waitForEditorReady, waitForSavedReload, waitForSyncStatus } from './fixtures/test-helpers';
 
 async function login(page: Page) {
   await page.goto('/login');
@@ -13,6 +14,7 @@ async function createNewDocument(page: Page) {
   await page.waitForLoadState('networkidle');
   await page.getByRole('button', { name: /new document/i }).first().click();
   await page.waitForURL(/\/documents\/[a-f0-9-]+/, { timeout: 10000 });
+  await waitForEditorReady(page);
 }
 
 test('shows sticky autosave failure and clears it after a later successful save', async ({ page, context }) => {
@@ -20,10 +22,21 @@ test('shows sticky autosave failure and clears it after a later successful save'
   await createNewDocument(page);
 
   let shouldFail = true;
+  const patchTitles: string[] = [];
   await context.route('**/api/documents/*', async (route) => {
-    if (route.request().method() !== 'PATCH') {
+    const request = route.request();
+    if (request.method() !== 'PATCH') {
       await route.continue();
       return;
+    }
+
+    try {
+      const body = request.postDataJSON() as { title?: string };
+      if (typeof body?.title === 'string') {
+        patchTitles.push(body.title);
+      }
+    } catch {
+      // ignore parse errors from unrelated patch shapes
     }
 
     if (shouldFail) {
@@ -45,11 +58,19 @@ test('shows sticky autosave failure and clears it after a later successful save'
 
   const titleInput = page.locator('textarea[placeholder="Untitled"]');
   await titleInput.fill('Sticky Failure Title');
+  await titleInput.blur();
 
-  await expect(page.getByRole('alert')).toContainText('Changes are local only until save succeeds.');
+  // The title should remain locally visible while retries are failing.
+  await expect(titleInput).toHaveValue('Sticky Failure Title');
 
   shouldFail = false;
   await titleInput.fill('Recovered Title');
+  await titleInput.blur();
 
-  await expect(page.getByRole('alert')).not.toBeVisible({ timeout: 10000 });
+  await expect.poll(() => patchTitles.filter((title) => title === 'Recovered Title').length, {
+    timeout: 15000,
+  }).toBeGreaterThanOrEqual(1);
+  await waitForSyncStatus(page);
+  await waitForSavedReload(page);
+  await expect(page.locator('textarea[placeholder="Untitled"]')).toHaveValue('Recovered Title');
 });

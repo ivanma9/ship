@@ -1,4 +1,5 @@
-import { test, expect } from './fixtures/isolated-env'
+import { test, expect, type Page } from './fixtures/isolated-env'
+import { typeInEditorWithRetry, waitForEditorReady, waitForSyncStatus } from './fixtures/test-helpers'
 
 /**
  * Tests that /my-week reflects plan/retro edits after navigating back.
@@ -7,13 +8,6 @@ import { test, expect } from './fixtures/isolated-env'
  * Yjs WebSocket (no client-side mutation), so navigating back showed stale data.
  * Fix: staleTime set to 0 so every mount refetches fresh data from the API.
  *
- * KNOWN FLAKY: The retro test fails on first attempt but passes on retry.
- * The retro document IS created (shows as a link), but its Yjs content isn't
- * persisted to the `content` column by the time the /my-week API reads it —
- * even with a 10s wait. The plan test (same pattern, runs first) always passes.
- * Root cause is likely in how the Yjs collaboration server handles JSON-to-Yjs
- * conversion for newly created documents (no yjs_state yet, only template JSON
- * in the content column). Needs investigation on a separate branch.
  */
 
 test.describe('My Week - stale data after editing plan/retro', () => {
@@ -24,6 +18,46 @@ test.describe('My Week - stale data after editing plan/retro', () => {
     await page.getByRole('button', { name: 'Sign in', exact: true }).click()
     await expect(page).not.toHaveURL('/login', { timeout: 5000 })
   })
+
+  async function waitForDocumentApiContent(page: Page, expectedText: string): Promise<void> {
+    const match = page.url().match(/\/documents\/([a-f0-9-]+)/)
+    const documentId = match?.[1]
+    expect(documentId, 'Expected to be on a document URL before polling document API').toBeTruthy()
+
+    await expect.poll(async () => {
+      return page.evaluate(async ({ id }) => {
+        const response = await fetch(`/api/documents/${id}`, { credentials: 'include' })
+        if (!response.ok) return ''
+        const data = await response.json()
+        return JSON.stringify(data.content ?? '')
+      }, { id: documentId! })
+    }, {
+      timeout: 60000,
+      intervals: [250, 500, 1000, 2000, 5000],
+    }).toContain(expectedText)
+  }
+
+  async function typeIntoFirstEditableWeeklySlot(page: Page, text: string): Promise<void> {
+    const listParagraph = page.locator('.ProseMirror li p').first()
+    const rootParagraph = page.locator('.ProseMirror > p').first()
+
+    await expect(async () => {
+      if (await listParagraph.count()) {
+        await listParagraph.click({ position: { x: 12, y: 12 } })
+      } else if (await rootParagraph.count()) {
+        await rootParagraph.click({ position: { x: 12, y: 12 } })
+      } else {
+        await typeInEditorWithRetry(page, text)
+        return
+      }
+
+      await page.keyboard.type(text)
+      await expect.poll(async () => page.locator('.ProseMirror').textContent(), {
+        timeout: 10000,
+        intervals: [250, 500, 1000],
+      }).toContain(text)
+    }).toPass({ timeout: 20000, intervals: [500, 1000, 2000] })
+  }
 
   test('plan edits are visible on /my-week after navigating back', async ({ page }) => {
     // 1. Navigate to /my-week
@@ -37,18 +71,14 @@ test.describe('My Week - stale data after editing plan/retro', () => {
     await expect(page).toHaveURL(/\/documents\/[a-f0-9-]+/, { timeout: 10000 })
 
     // 4. Wait for the TipTap editor to be ready
-    const editor = page.locator('.tiptap')
-    await expect(editor).toBeVisible({ timeout: 10000 })
+    await waitForEditorReady(page)
+    await waitForSyncStatus(page)
 
-    // 5. Type a list item into the editor
-    // Use "1. " prefix to create a numbered list (orderedList with listItem nodes)
-    await editor.click()
-    await page.keyboard.type('1. Ship the new dashboard feature')
+    // 5. The plan template already provides empty bullet items; fill the first one.
+    await typeIntoFirstEditableWeeklySlot(page, 'Ship the new dashboard feature')
 
-    // 6. Wait for the collaboration server to persist the content
-    // "Saved" means WebSocket synced; add extra time for DB write completion
-    await expect(page.getByText('Saved')).toBeVisible({ timeout: 10000 })
-    await page.waitForTimeout(3000)
+    // 6. Wait for collaborative persistence before polling the API-backed document payload.
+    await waitForDocumentApiContent(page, 'Ship the new dashboard feature')
 
     // 7. Navigate back to /my-week using client-side navigation (Dashboard icon in rail)
     await page.getByRole('button', { name: 'Dashboard' }).click()
@@ -56,8 +86,11 @@ test.describe('My Week - stale data after editing plan/retro', () => {
 
     // 8. Verify the plan content is visible on the my-week page
     // The my-week API reads from the `content` column which is updated by the
-    // collaboration server's persistence layer (async from WebSocket edits)
-    await expect(page.getByText('Ship the new dashboard feature')).toBeVisible({ timeout: 15000 })
+    // collaboration server's persistence layer after collaborative sync.
+    await expect.poll(async () => page.locator('body').textContent(), {
+      timeout: 15000,
+      intervals: [250, 500, 1000],
+    }).toContain('Ship the new dashboard feature')
   })
 
   test('retro edits are visible on /my-week after navigating back', async ({ page }) => {
@@ -72,22 +105,23 @@ test.describe('My Week - stale data after editing plan/retro', () => {
     await expect(page).toHaveURL(/\/documents\/[a-f0-9-]+/, { timeout: 10000 })
 
     // 4. Wait for the TipTap editor to be ready
-    const editor = page.locator('.tiptap')
-    await expect(editor).toBeVisible({ timeout: 10000 })
+    await waitForEditorReady(page)
+    await waitForSyncStatus(page)
 
     // 5. Type a list item into the editor
-    await editor.click()
-    await page.keyboard.type('1. Completed the API refactoring')
+    await typeIntoFirstEditableWeeklySlot(page, 'Completed the API refactoring')
 
-    // 6. Wait for the collaboration server to persist the content
-    await expect(page.getByText('Saved')).toBeVisible({ timeout: 10000 })
-    await page.waitForTimeout(3000)
+    // 6. Wait for collaborative persistence before polling the API-backed document payload.
+    await waitForDocumentApiContent(page, 'Completed the API refactoring')
 
     // 7. Navigate back to /my-week using client-side navigation
     await page.getByRole('button', { name: 'Dashboard' }).click()
     await expect(page.getByRole('heading', { name: /^Week \d+$/ })).toBeVisible({ timeout: 10000 })
 
     // 8. Verify the retro content is visible on the my-week page
-    await expect(page.getByText('Completed the API refactoring')).toBeVisible({ timeout: 15000 })
+    await expect.poll(async () => page.locator('body').textContent(), {
+      timeout: 15000,
+      intervals: [250, 500, 1000],
+    }).toContain('Completed the API refactoring')
   })
 })

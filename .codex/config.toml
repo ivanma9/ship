@@ -1,0 +1,9 @@
+model = "gpt-5.4"
+[projects."/Users/ivanma/Desktop/gauntlet/ShipShape/ship"]
+trust_level = "trusted"
+
+[notice.model_migrations]
+"gpt-5.3-codex" = "gpt-5.4"
+
+[features]
+multi_agent = true

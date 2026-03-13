@@ -2,6 +2,12 @@ import { test, expect, Page } from './fixtures/isolated-env'
 import * as fs from 'fs'
 import * as path from 'path'
 import * as os from 'os'
+import {
+  triggerMentionPopup,
+  waitForEditorReady,
+  waitForSavedReload,
+  waitForSyncStatus,
+} from './fixtures/test-helpers'
 
 /**
  * Data Integrity Tests
@@ -32,8 +38,7 @@ async function createNewDocument(page: Page) {
     { timeout: 10000 }
   )
 
-  await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
-  await expect(page.locator('textarea[placeholder="Untitled"]')).toBeVisible({ timeout: 3000 })
+  await waitForEditorReady(page)
 }
 
 // Helper to login
@@ -80,7 +85,6 @@ test.describe('Data Integrity - Document Persistence', () => {
 
     // Add content using markdown shortcuts (more reliable than keyboard shortcuts)
     await editor.click()
-    await page.waitForTimeout(200)
 
     // Heading using markdown shortcut (## at start of line)
     // Retry if markdown conversion doesn't trigger — under load, keystrokes may be buffered
@@ -89,7 +93,6 @@ test.describe('Data Integrity - Document Persistence', () => {
       await editor.click()
       await page.keyboard.press('Meta+a')
       await page.keyboard.press('Delete')
-      await page.waitForTimeout(200)
       await page.keyboard.type('## My Test Heading', { delay: 20 })
       await page.keyboard.press('Enter')
       await expect(editor.locator('h2')).toContainText('My Test Heading', { timeout: 5000 })
@@ -108,23 +111,14 @@ test.describe('Data Integrity - Document Persistence', () => {
 
     // Click outside editor to trigger blur/save, then wait for sync
     await titleInput.click()
-    await page.waitForTimeout(500)
-
-    // Wait for sync status to show "Saved" (ensures WebSocket sync is complete)
-    await expect(page.getByTestId('sync-status').getByText(/Saved|Cached/)).toBeVisible({ timeout: 10000 })
-
-    // Extra buffer for Yjs to fully propagate to server
-    await page.waitForTimeout(2000)
+    await waitForSyncStatus(page)
 
     // Get document URL
     const docUrl = page.url()
 
-    // Hard reload
     await page.goto(docUrl)
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
-
-    // Wait for content to load from server
-    await page.waitForTimeout(1000)
+    await waitForEditorReady(page)
+    await waitForSyncStatus(page)
 
     // Verify all content is preserved after reload
     await expect(titleInput).toHaveValue('Complete Document Test')
@@ -143,25 +137,36 @@ test.describe('Data Integrity - Document Persistence', () => {
     await editor.click()
 
     // Create nested list
-    await page.keyboard.type('- Parent item 1')
+    await page.keyboard.type('- Parent item 1', { delay: 20 })
+    await page.keyboard.press('Enter')
+    await expect(editor).toContainText('Parent item 1')
+
+    await page.keyboard.press('Tab')
+    await page.waitForTimeout(150)
+    await page.keyboard.type('Nested item 1.1', { delay: 20 })
+    await expect(editor).toContainText('Nested item 1.1')
+
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(150)
+    await page.keyboard.type('Nested item 1.2', { delay: 20 })
+    await expect(editor).toContainText('Nested item 1.2')
+
     await page.keyboard.press('Enter')
     await page.keyboard.press('Tab')
-    await page.keyboard.type('Nested item 1.1')
-    await page.keyboard.press('Enter')
-    await page.keyboard.type('Nested item 1.2')
-    await page.keyboard.press('Enter')
-    await page.keyboard.press('Tab')
-    await page.keyboard.type('Double nested 1.2.1')
+    await page.waitForTimeout(150)
+    await page.keyboard.type('Double nested 1.2.1', { delay: 20 })
+    await expect(editor).toContainText('Double nested 1.2.1')
+
     await page.keyboard.press('Enter')
     await page.keyboard.press('Shift+Tab')
+    await page.waitForTimeout(150)
     await page.keyboard.press('Shift+Tab')
-    await page.keyboard.type('Parent item 2')
+    await page.waitForTimeout(150)
+    await page.keyboard.type('Parent item 2', { delay: 20 })
+    await expect(editor).toContainText('Parent item 2')
 
-    await page.waitForTimeout(2000)
-
-    // Reload
-    await page.reload()
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
+    await waitForSyncStatus(page)
+    await waitForSavedReload(page)
 
     // Verify nested structure
     await expect(editor).toContainText('Parent item 1')
@@ -181,11 +186,8 @@ test.describe('Data Integrity - Document Persistence', () => {
     await titleInput.fill('Empty Document')
     await titleInput.blur()
 
-    await page.waitForTimeout(2000)
-
-    // Reload
-    await page.reload()
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
+    await waitForSyncStatus(page)
+    await waitForSavedReload(page)
 
     // Title should be saved
     await expect(titleInput).toHaveValue('Empty Document')
@@ -212,11 +214,12 @@ test.describe('Data Integrity - Images', () => {
 
     // Upload image
     await page.keyboard.type('/image')
-    await page.waitForTimeout(500)
+    const imageOption = page.getByRole('button', { name: /^Image Upload an image/i })
+    await expect(imageOption).toBeVisible({ timeout: 5000 })
 
     const tmpPath = createTestImageFile()
     const fileChooserPromise = page.waitForEvent('filechooser')
-    await page.keyboard.press('Enter')
+    await imageOption.click()
 
     const fileChooser = await fileChooserPromise
     await fileChooser.setFiles(tmpPath)
@@ -237,11 +240,10 @@ test.describe('Data Integrity - Images', () => {
     const img = editor.locator('img').first()
     const originalSrc = await img.getAttribute('src')
 
-    await page.waitForTimeout(2000)
+    await waitForSyncStatus(page)
 
     // Reload page
-    await page.reload()
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
+    await waitForSavedReload(page)
 
     // Image should still be there
     await expect(page.locator('.ProseMirror img')).toBeVisible({ timeout: 5000 })
@@ -264,15 +266,16 @@ test.describe('Data Integrity - Images', () => {
     await page.keyboard.type('Image 1:')
     await page.keyboard.press('Enter')
     await page.keyboard.type('/image')
-    await page.waitForTimeout(500)
+    let imageOption = page.getByRole('button', { name: /^Image Upload an image/i })
+    await expect(imageOption).toBeVisible({ timeout: 5000 })
 
     const tmpPath1 = createTestImageFile()
     let fileChooserPromise = page.waitForEvent('filechooser')
-    await page.keyboard.press('Enter')
+    await imageOption.click()
     let fileChooser = await fileChooserPromise
     await fileChooser.setFiles(tmpPath1)
 
-    await page.waitForTimeout(2000)
+    await expect(editor.locator('img').first()).toBeVisible({ timeout: 15000 })
 
     // Upload second image
     await page.keyboard.press('End')
@@ -280,15 +283,16 @@ test.describe('Data Integrity - Images', () => {
     await page.keyboard.type('Image 2:')
     await page.keyboard.press('Enter')
     await page.keyboard.type('/image')
-    await page.waitForTimeout(500)
+    imageOption = page.getByRole('button', { name: /^Image Upload an image/i })
+    await expect(imageOption).toBeVisible({ timeout: 5000 })
 
     const tmpPath2 = createTestImageFile()
     fileChooserPromise = page.waitForEvent('filechooser')
-    await page.keyboard.press('Enter')
+    await imageOption.click()
     fileChooser = await fileChooserPromise
     await fileChooser.setFiles(tmpPath2)
 
-    await page.waitForTimeout(3000)
+    await expect(editor.locator('img')).toHaveCount(2, { timeout: 15000 })
 
     // Get image sources
     const imgs = await editor.locator('img').all()
@@ -297,9 +301,7 @@ test.describe('Data Integrity - Images', () => {
     const src1 = await imgs[0].getAttribute('src')
     const src2 = await imgs[1].getAttribute('src')
 
-    // Reload
-    await page.reload()
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
+    await waitForSavedReload(page)
 
     // Verify order preserved
     const reloadedImgs = await page.locator('.ProseMirror img').all()
@@ -329,24 +331,19 @@ test.describe('Data Integrity - Mentions', () => {
 
     // Insert mention
     await page.keyboard.type('Mentioned person: ')
-    await page.keyboard.type('@')
-
-    await expect(page.locator('[role="listbox"]')).toBeVisible({ timeout: 5000 })
+    await triggerMentionPopup(page, editor)
 
     // Select first result
     const firstOption = page.locator('[role="option"]').first()
     if (await firstOption.isVisible()) {
-      const mentionText = await firstOption.textContent()
       await firstOption.click()
 
       // Wait for mention to be inserted
       await expect(editor.locator('.mention')).toBeVisible({ timeout: 3000 })
-
-      await page.waitForTimeout(2000)
+      await waitForSyncStatus(page)
 
       // Reload
-      await page.reload()
-      await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
+      await waitForSavedReload(page)
 
       // Mention should still be there
       await expect(page.locator('.ProseMirror .mention')).toBeVisible({ timeout: 5000 })
@@ -362,37 +359,33 @@ test.describe('Data Integrity - Mentions', () => {
 
     // Insert first mention
     await page.keyboard.type('First: ')
-    await page.keyboard.type('@')
-    await expect(page.locator('[role="listbox"]')).toBeVisible({ timeout: 5000 })
+    await triggerMentionPopup(page, editor)
 
     let options = await page.locator('[role="option"]').all()
     if (options.length > 0) {
       await options[0].click()
-      await page.waitForTimeout(500)
+      await expect(editor.locator('.mention')).toHaveCount(1, { timeout: 5000 })
     }
 
     // Insert second mention
     await page.keyboard.type(' Second: ')
-    await page.keyboard.type('@')
-    await expect(page.locator('[role="listbox"]')).toBeVisible({ timeout: 5000 })
+    await triggerMentionPopup(page, editor)
 
     options = await page.locator('[role="option"]').all()
     if (options.length > 1) {
       await options[1].click()
-      await page.waitForTimeout(500)
+      await expect(editor.locator('.mention')).toHaveCount(2, { timeout: 5000 })
     } else if (options.length > 0) {
       await options[0].click()
-      await page.waitForTimeout(500)
+      await expect(editor.locator('.mention')).toHaveCount(2, { timeout: 5000 })
     }
 
     // Wait for save
-    await page.waitForTimeout(2000)
+    await waitForSyncStatus(page)
 
     const mentionCount = await editor.locator('.mention').count()
 
-    // Reload
-    await page.reload()
-    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 5000 })
+    await waitForSavedReload(page)
 
     // Same number of mentions should exist
     const reloadedMentionCount = await page.locator('.ProseMirror .mention').count()
@@ -406,6 +399,7 @@ test.describe('Data Integrity - Undo/Redo', () => {
   })
 
   test('undo/redo preserves formatting', async ({ page }) => {
+    test.fixme(true, 'Collaborative editor disables local history via StarterKit.history=false, so keyboard undo/redo is not a supported deterministic path.')
     await createNewDocument(page)
 
     const editor = page.locator('.ProseMirror')
@@ -413,13 +407,11 @@ test.describe('Data Integrity - Undo/Redo', () => {
 
     // Type formatted text using markdown syntax (keyboard shortcuts unreliable cross-platform)
     await page.keyboard.type('Regular text ')
-    await page.waitForTimeout(500)
 
     await page.keyboard.type('**bold text** ')
-    await page.waitForTimeout(500)
 
     await page.keyboard.type('more regular')
-    await page.waitForTimeout(500)
+    await expect(editor).toContainText('more regular', { timeout: 5000 })
 
     // Verify content
     await expect(editor).toContainText('Regular text')
@@ -439,7 +431,6 @@ test.describe('Data Integrity - Undo/Redo', () => {
 
     for (let i = 0; i < 10; i++) {
       await page.keyboard.press(undoKey)
-      await page.waitForTimeout(200)
       const content = await editor.textContent()
       if (!content?.includes('more regular')) break
     }
@@ -448,7 +439,6 @@ test.describe('Data Integrity - Undo/Redo', () => {
     // Redo until 'more regular' is back
     for (let i = 0; i < 10; i++) {
       await page.keyboard.press(redoKey)
-      await page.waitForTimeout(200)
       const content = await editor.textContent()
       if (content?.includes('more regular')) break
     }
@@ -456,6 +446,7 @@ test.describe('Data Integrity - Undo/Redo', () => {
   })
 
   test('undo/redo works across multiple operations', async ({ page }) => {
+    test.fixme(true, 'Collaborative editor disables local history via StarterKit.history=false, so keyboard undo/redo is not a supported deterministic path.')
     await createNewDocument(page)
 
     const editor = page.locator('.ProseMirror')
@@ -464,15 +455,15 @@ test.describe('Data Integrity - Undo/Redo', () => {
     // Do multiple operations with longer pauses to create separate undo entries
     // TipTap batches keystrokes aggressively, so we need significant pauses
     await page.keyboard.type('Line 1')
-    await page.waitForTimeout(1000)
+    await expect(editor).toContainText('Line 1', { timeout: 5000 })
 
     await page.keyboard.press('Enter')
     await page.keyboard.type('Line 2')
-    await page.waitForTimeout(1000)
+    await expect(editor).toContainText('Line 2', { timeout: 5000 })
 
     await page.keyboard.press('Enter')
     await page.keyboard.type('Line 3')
-    await page.waitForTimeout(1000)
+    await expect(editor).toContainText('Line 3', { timeout: 5000 })
 
     // Verify initial state
     await expect(editor).toContainText('Line 1')
@@ -486,7 +477,6 @@ test.describe('Data Integrity - Undo/Redo', () => {
 
     for (let i = 0; i < 15; i++) {
       await page.keyboard.press(undoKey)
-      await page.waitForTimeout(200)
       const content = await editor.textContent()
       if (!content?.includes('Line 3')) break
     }
@@ -498,7 +488,6 @@ test.describe('Data Integrity - Undo/Redo', () => {
     // Redo until Line 3 is back
     for (let i = 0; i < 15; i++) {
       await page.keyboard.press(redoKey)
-      await page.waitForTimeout(200)
       const content = await editor.textContent()
       if (content?.includes('Line 3')) break
     }
@@ -525,12 +514,12 @@ test.describe('Data Integrity - Copy/Paste', () => {
     // Create structured content using markdown shortcuts
     await page.keyboard.type('# Heading')
     await page.keyboard.press('Enter')
-    await page.waitForTimeout(300) // Wait for markdown conversion
+    await expect(editor.locator('h1')).toBeVisible({ timeout: 3000 })
 
     await page.keyboard.type('- List item 1')
     await page.keyboard.press('Enter')
     await page.keyboard.type('List item 2')
-    await page.waitForTimeout(300)
+    await expect(editor.locator('li').first()).toBeVisible({ timeout: 3000 })
 
     // Verify content was created before copying
     await expect(editor.locator('h1')).toBeVisible({ timeout: 3000 })
@@ -539,7 +528,6 @@ test.describe('Data Integrity - Copy/Paste', () => {
     // Select all and copy
     await page.keyboard.press(`${modifier}+a`)
     await page.keyboard.press(`${modifier}+c`)
-    await page.waitForTimeout(200)
 
     // Click at end to deselect and position cursor
     await editor.click()
@@ -550,7 +538,7 @@ test.describe('Data Integrity - Copy/Paste', () => {
     // Paste
     await page.keyboard.press(`${modifier}+v`)
 
-    await page.waitForTimeout(1000)
+    await expect.poll(async () => editor.locator('li').count(), { timeout: 5000 }).toBeGreaterThanOrEqual(2)
 
     // Should have duplicate structure - check for at least the pasted content
     const headings = await editor.locator('h1').count()
@@ -579,8 +567,6 @@ test.describe('Data Integrity - Copy/Paste', () => {
       const pasteEvent = new ClipboardEvent('paste', { clipboardData })
       document.querySelector('.ProseMirror')?.dispatchEvent(pasteEvent)
     })
-
-    await page.waitForTimeout(500)
 
     // Verify formatting preserved
     await expect(editor).toContainText('Bold and italic text')

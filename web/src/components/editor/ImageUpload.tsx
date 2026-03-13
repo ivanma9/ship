@@ -124,11 +124,19 @@ async function handleImageUpload(
   editor
     .chain()
     .focus()
-    .setImage({
-      src: dataUrl,
-      alt: file.name,
-      title: file.name,
-    })
+    .insertContent([
+      {
+        type: 'image',
+        attrs: {
+          src: dataUrl,
+          alt: file.name,
+          title: file.name,
+        },
+      },
+      {
+        type: 'paragraph',
+      },
+    ])
     .run();
 
   try {

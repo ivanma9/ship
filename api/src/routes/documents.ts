@@ -1129,6 +1129,29 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
       }
     }
 
+    let belongs_to: Array<{ id: string; type: string; title?: string; color?: string }> = [];
+    if (
+      updatedDoc.document_type === 'issue' ||
+      updatedDoc.document_type === 'wiki' ||
+      updatedDoc.document_type === 'sprint' ||
+      updatedDoc.document_type === 'project'
+    ) {
+      const assocResult = await pool.query(
+        `SELECT da.related_id as id, da.relationship_type as type,
+                d.title, (d.properties->>'color') as color
+         FROM document_associations da
+         LEFT JOIN documents d ON d.id = da.related_id
+         WHERE da.document_id = $1`,
+        [id]
+      );
+      belongs_to = assocResult.rows.map(row => ({
+        id: row.id,
+        type: row.type,
+        title: row.title || undefined,
+        color: row.color || undefined,
+      }));
+    }
+
     res.json({
       ...updatedDoc,
       // Issue properties
@@ -1152,6 +1175,12 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
       plan_approval: props.plan_approval,
       review_approval: props.review_approval,
       review_rating: props.review_rating,
+      ...(
+        (updatedDoc.document_type === 'issue' ||
+          updatedDoc.document_type === 'wiki' ||
+          updatedDoc.document_type === 'sprint' ||
+          updatedDoc.document_type === 'project') && { belongs_to }
+      ),
     });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});

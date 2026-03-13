@@ -143,8 +143,9 @@ test.describe('Project Weeks Tab', () => {
       'Click Test Project'
     );
 
-    // Create allocation for week 10
-    await createAllocation(page, apiServer.url, csrfToken, projectId, personId, 10);
+    // Use a unique week number so this test cannot pick up another test's
+    // idempotent weekly plan document for the same person.
+    await createAllocation(page, apiServer.url, csrfToken, projectId, personId, 20);
 
     // Navigate to project's Weeks tab
     await page.goto(`/documents/${projectId}/weeks`);
@@ -187,8 +188,9 @@ test.describe('Project Weeks Tab', () => {
       'Navigation Test Project'
     );
 
-    // Create allocation
-    await createAllocation(page, apiServer.url, csrfToken, projectId, personId, 10);
+    // Use a unique week number so this test cannot pick up another test's
+    // idempotent weekly plan document for the same person.
+    await createAllocation(page, apiServer.url, csrfToken, projectId, personId, 30);
 
     // Navigate to project's Weeks tab and click to open weekly plan
     await page.goto(`/documents/${projectId}/weeks`);
