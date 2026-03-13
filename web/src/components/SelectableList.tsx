@@ -79,6 +79,10 @@ export function SelectableList<T extends { id: string }>({
     getItemId,
     hoveredId,
     initialSelectedIds,
+    onEnter: onItemClick ? (id) => {
+      const item = items.find((i) => getItemId(i) === id);
+      if (item) onItemClick(item);
+    } : undefined,
   });
 
   // Notify parent of selection changes with both IDs and selection object
@@ -144,7 +148,7 @@ export function SelectableList<T extends { id: string }>({
         aria-multiselectable={selectable ? 'true' : undefined}
         aria-label={ariaLabel}
         aria-rowcount={items.length + 1}
-        aria-colcount={totalColCount || undefined}
+        aria-colcount={totalColCount > 0 ? totalColCount : undefined}
         tabIndex={0}
         onKeyDown={handleGridKeyDown}
         onMouseLeave={() => {

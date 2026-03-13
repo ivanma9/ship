@@ -313,18 +313,13 @@ test.describe('Accessibility - ARIA Grid Keyboard Traversal', () => {
     const focusedRowAfterUp = page.locator('[role="row"][data-focused="true"]')
     await expect(focusedRowAfterUp).toBeVisible()
 
-    // Press Enter to activate the focused row (navigate to issue detail)
-    // We capture URL before and after to detect navigation
-    const urlBefore = page.url()
+    // Press Enter to activate the focused row — must invoke primary action (navigate to document)
     await page.keyboard.press('Enter')
-    // Give the app a moment to process Enter (may toggle selection rather than navigate)
-    await page.waitForTimeout(200)
-    // Either URL changed (navigation) or we remain on /issues with selection toggled — both valid
-    const urlAfter = page.url()
-    // The grid should still be in the DOM (or URL changed to issue detail)
-    const stillOnIssues = urlAfter.includes('/issues')
-    const navigatedToDetail = !stillOnIssues
-    expect(stillOnIssues || navigatedToDetail).toBeTruthy()
+    await expect(page).toHaveURL(/\/documents\//, { timeout: 3000 })
+
+    // Navigate back to /issues to clean up
+    await page.goto('/issues')
+    await page.waitForLoadState('networkidle')
   })
 })
 
