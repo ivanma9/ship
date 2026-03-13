@@ -11,7 +11,7 @@ RUN npm config set strict-ssl false
 RUN npm install -g pnpm@9.15.4 && pnpm config set strict-ssl false
 
 # Copy package files for dependency installation
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.json ./
 COPY api/package.json ./api/
 COPY shared/package.json ./shared/
 
