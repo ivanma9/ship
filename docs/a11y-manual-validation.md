@@ -10,10 +10,10 @@
 
 | Route | Criterion | Result | Tester | Date | SR Version | Notes |
 |-------|-----------|--------|--------|------|------------|-------|
-| /issues | All cells announced with column header | Implementation complete — pending manual VoiceOver session before merge | | | | aria-label="${colHeader}: ${value}" added to every gridcell in IssueRowContent |
-| /issues | Row actions have meaningful labels | Implementation complete — pending manual VoiceOver session before merge | | | | "Add to context" button has aria-label; status badge has aria-label; row click navigates (no unlabelled button) |
-| /issues | Empty state announced | Implementation complete — pending manual VoiceOver session before merge | | | | defaultEmptyState wrapped with role="status" aria-live="polite" |
-| /issues | Keyboard traversal complete (all initially loaded rows) | Pending manual verification — to be filled by developer before merge | | | | ARIA grid attributes added (aria-rowcount, aria-colcount, aria-rowindex, aria-colindex); ArrowLeft/Right cell navigation added in SelectableList |
+| /issues | All cells announced with column header | PASS | Ivan | 2026-03-13 | VoiceOver macOS / Safari | VoiceOver announces cell content correctly |
+| /issues | Row actions have meaningful labels | FAIL | Ivan | 2026-03-13 | VoiceOver macOS / Safari | No "+" button visible at end of row — action label implementation may be for a feature not present in current UI; needs investigation |
+| /issues | Empty state announced | PARTIAL | Ivan | 2026-03-13 | VoiceOver macOS / Safari | "No issues found" only visible on error/refresh state, not on normal empty list; role=status placement may be wrong or empty state not triggered correctly in normal flow |
+| /issues | Keyboard traversal complete (all initially loaded rows) | PARTIAL | Ivan | 2026-03-13 | VoiceOver macOS / Safari | Arrow key navigation works; Tab exit works; Enter on row does NOT navigate to issue detail — primary action broken |
 | /projects | No serious contrast violations | PASS | automated | 2026-03-13 | | Confirmed by automated axe scan (zero serious violations) |
 | /projects | Keyboard traversal complete | — | | | | |
 | /programs | No serious contrast violations | PASS | automated | 2026-03-13 | | Confirmed by automated axe scan (zero serious violations) |
