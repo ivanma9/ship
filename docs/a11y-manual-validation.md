@@ -11,9 +11,9 @@
 | Route | Criterion | Result | Tester | Date | SR Version | Notes |
 |-------|-----------|--------|--------|------|------------|-------|
 | /issues | All cells announced with column header | PASS | Ivan | 2026-03-13 | VoiceOver macOS / Safari | VoiceOver announces cell content correctly |
-| /issues | Row actions have meaningful labels | FAIL | Ivan | 2026-03-13 | VoiceOver macOS / Safari | No "+" button visible at end of row — action label implementation may be for a feature not present in current UI; needs investigation |
-| /issues | Empty state announced | PARTIAL | Ivan | 2026-03-13 | VoiceOver macOS / Safari | "No issues found" only visible on error/refresh state, not on normal empty list; role=status placement may be wrong or empty state not triggered correctly in normal flow |
-| /issues | Keyboard traversal complete (all initially loaded rows) | PARTIAL | Ivan | 2026-03-13 | VoiceOver macOS / Safari | Arrow key navigation works; Tab exit works; Enter on row does NOT navigate to issue detail — primary action broken |
+| /issues | Row actions have meaningful labels | N/A | Ivan | 2026-03-13 | VoiceOver macOS / Safari | "+" button only renders in "Show All Issues" mode (allowShowAllIssues + showAllIssues both true). aria-label is correct when button is visible. Re-test with Show All Issues enabled. |
+| /issues | Empty state announced | FIXED — re-test needed | Ivan | 2026-03-13 | VoiceOver macOS / Safari | Error state ("something went wrong") now has role=status aria-live=polite. Normal empty state also has it. To test: filter issues to zero results or trigger an error state. |
+| /issues | Keyboard traversal complete (all initially loaded rows) | FIXED — re-test needed | Ivan | 2026-03-13 | VoiceOver macOS / Safari | Row-level onKeyDown Enter handler added directly to each tr — no longer depends on table-level event bubbling. Re-test Enter navigation in VoiceOver. |
 | /projects | No serious contrast violations | PASS | automated | 2026-03-13 | | Confirmed by automated axe scan (zero serious violations) |
 | /projects | Keyboard traversal complete | — | | | | |
 | /programs | No serious contrast violations | PASS | automated | 2026-03-13 | | Confirmed by automated axe scan (zero serious violations) |
