@@ -15,12 +15,18 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY api/package.json ./api/
 COPY shared/package.json ./shared/
 
-# Install production dependencies only (ignore prepare scripts that require dev deps)
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts && pnpm store prune
+# Install all dependencies (dev included for build step)
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
-# Copy pre-built dist directories (built locally before deployment)
-COPY shared/dist/ ./shared/dist/
-COPY api/dist/ ./api/dist/
+# Copy source files
+COPY shared/ ./shared/
+COPY api/ ./api/
+
+# Build shared types then API
+RUN pnpm build:shared && pnpm build:api
+
+# Prune to production dependencies only after build
+RUN pnpm prune --prod && pnpm store prune
 
 # Expose port
 EXPOSE 80

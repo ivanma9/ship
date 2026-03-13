@@ -1,13 +1,14 @@
 name: Deploy
 
 # Runs automatically after CI passes on master.
-# Deploys API to Railway and frontend to Vercel.
+# Railway auto-deploys the API on push (connected to GitHub repo).
+# This workflow handles Vercel frontend deployment only.
 #
 # Required GitHub secrets:
-#   RAILWAY_API_TOKEN      - Railway API token (from railway.app dashboard)
+#   RAILWAY_API_TOKEN      - Railway API token (not used here but kept for reference)
 #   VERCEL_TOKEN           - Vercel personal access token
-#   VERCEL_ORG_ID          - Vercel team/org ID (from vercel project settings)
-#   VERCEL_PROJECT_ID      - Vercel project ID (from vercel project settings)
+#   VERCEL_ORG_ID          - Vercel team/org ID
+#   VERCEL_PROJECT_ID      - Vercel project ID
 
 on:
   workflow_run:
@@ -16,44 +17,6 @@ on:
     branches: [master]
 
 jobs:
-  deploy-api:
-    name: Deploy API to Railway
-    runs-on: ubuntu-latest
-    # Only deploy when CI passed
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build shared
-        run: pnpm build:shared
-
-      - name: Build API
-        run: pnpm build:api
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Link Railway project
-        run: |
-          mkdir -p .railway
-          echo '{"projectId":"${{ secrets.RAILWAY_PROJECT_ID }}","environmentName":"production"}' > .railway/config.json
-
-      - name: Deploy to Railway
-        run: railway up --detach --service web
-        env:
-          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
-
   deploy-frontend:
     name: Deploy Frontend to Vercel
     runs-on: ubuntu-latest
@@ -78,11 +41,17 @@ jobs:
       - name: Build frontend
         run: pnpm build:web
         env:
-          # Set to your Railway API public URL after first Railway deploy
           VITE_API_URL: ${{ vars.RAILWAY_API_URL }}
 
       - name: Install Vercel CLI
         run: npm install -g vercel
+
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --token ${{ secrets.VERCEL_TOKEN }}
+        working-directory: web
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Build for Vercel
         run: vercel build --prod --token ${{ secrets.VERCEL_TOKEN }}
