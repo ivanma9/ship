@@ -32,23 +32,13 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build shared
-        run: pnpm build:shared
-
-      - name: Build frontend
-        run: pnpm build:web
-        env:
-          VITE_API_URL: ${{ vars.RAILWAY_API_URL }}
-
       - name: Install Vercel CLI
         run: npm install -g vercel
 
       - name: Deploy to Vercel (production)
-        # Deploy web/dist as a static site from repo root — no rootDirectory set in project
-        run: vercel deploy web/dist --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
+        # Vercel runs the build itself using its configured buildCommand
+        run: vercel deploy --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VITE_API_URL: ${{ vars.RAILWAY_API_URL }}
