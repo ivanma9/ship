@@ -40,9 +40,9 @@ describe('transformIssueLinks', () => {
 
       const result = await transformIssueLinks(content, workspaceId) as TiptapDoc;
 
-      expect(result.content![0].content).toHaveLength(3);
-      expect(result.content![0].content![0]).toEqual({ type: 'text', text: 'See ' });
-      expect(result.content![0].content![1]).toEqual({
+      expect(result.content![0]!.content).toHaveLength(3);
+      expect(result.content![0]!.content![0]!).toEqual({ type: 'text', text: 'See ' });
+      expect(result.content![0]!.content![1]!).toEqual({
         type: 'text',
         text: '#42',
         marks: [
@@ -55,7 +55,7 @@ describe('transformIssueLinks', () => {
           },
         ],
       });
-      expect(result.content![0].content![2]).toEqual({ type: 'text', text: ' for details' });
+      expect(result.content![0]!.content![2]!).toEqual({ type: 'text', text: ' for details' });
     });
 
     it('transforms "issue #123" pattern to clickable link', async () => {
@@ -75,7 +75,7 @@ describe('transformIssueLinks', () => {
 
       const result = await transformIssueLinks(content, workspaceId) as TiptapDoc;
 
-      expect(result.content![0].content![1]).toEqual({
+      expect(result.content![0]!.content![1]!).toEqual({
         type: 'text',
         text: 'issue #100',
         marks: [
@@ -107,7 +107,7 @@ describe('transformIssueLinks', () => {
 
       const result = await transformIssueLinks(content, workspaceId) as TiptapDoc;
 
-      expect(result.content![0].content![1]).toEqual({
+      expect(result.content![0]!.content![1]!).toEqual({
         type: 'text',
         text: 'ISS-500',
         marks: [
@@ -144,7 +144,7 @@ describe('transformIssueLinks', () => {
       const result = await transformIssueLinks(content, workspaceId) as TiptapDoc;
 
       // Should split into multiple text nodes with links
-      const nodes = result.content![0].content as TiptapNode[];
+      const nodes = result.content![0]!.content as TiptapNode[];
       expect(nodes.some((n: TiptapNode) => n.text === '#10' && n.marks)).toBe(true);
       expect(nodes.some((n: TiptapNode) => n.text === '#20' && n.marks)).toBe(true);
       expect(nodes.some((n: TiptapNode) => n.text === 'issue #30' && n.marks)).toBe(true);
@@ -186,7 +186,7 @@ describe('transformIssueLinks', () => {
 
       await transformIssueLinks(content, workspaceId);
 
-      const queryArgs = vi.mocked(pool.query).mock.calls[0]![1] as unknown[];
+      const queryArgs = (vi.mocked(pool.query).mock.calls[0]![1] as unknown[]);
       const ticketNumbers = queryArgs[1];
 
       // Should only query for #5 once despite appearing multiple times
@@ -220,7 +220,7 @@ describe('transformIssueLinks', () => {
       const result = await transformIssueLinks(content, workspaceId) as TiptapDoc;
 
       // Should not transform already marked text
-      expect(result.content![0].content![0]).toEqual({
+      expect(result.content![0]!.content![0]!).toEqual({
         type: 'text',
         text: '#99 is already a link',
         marks: [{ type: 'link', attrs: { href: '/somewhere' } }],
@@ -250,8 +250,8 @@ describe('transformIssueLinks', () => {
       // When no issues are found, content is returned unchanged
       // (implementation optimization - doesn't transform if issueMap is empty)
       expect(result).toEqual(content);
-      expect(result.content![0].content![0].text).toBe('Non-existent #999');
-      expect(result.content![0].content![0].marks).toBeUndefined();
+      expect(result.content![0]!.content![0]!.text).toBe('Non-existent #999');
+      expect(result.content![0]!.content![0]!.marks).toBeUndefined();
     });
 
     it('transforms existing issues but not non-existent ones', async () => {
@@ -272,7 +272,7 @@ describe('transformIssueLinks', () => {
 
       const result = await transformIssueLinks(content, workspaceId) as TiptapDoc;
 
-      const nodes = result.content![0].content as TiptapNode[];
+      const nodes = result.content![0]!.content as TiptapNode[];
 
       // #50 should have link mark
       const link50 = nodes.find((n: TiptapNode) => n.text === '#50');
@@ -361,10 +361,10 @@ describe('transformIssueLinks', () => {
 
       const result = await transformIssueLinks(content, workspaceId) as TiptapDoc;
 
-      const paragraph = result.content![0].content![0].content![0];
+      const paragraph = result.content![0]!.content![0]!.content![0]!;
       const link = (paragraph.content as TiptapNode[]).find((n: TiptapNode) => n.text === '#25');
       expect(link?.marks).toBeDefined();
-      expect((link?.marks as Array<{ attrs: { href: string } }>)[0].attrs.href).toBe('/issues/issue-uuid-25');
+      expect((link?.marks as Array<{ attrs: { href: string } }>)[0]!.attrs.href).toBe('/issues/issue-uuid-25');
     });
 
     it('transforms issue links in blockquotes', async () => {
@@ -389,7 +389,7 @@ describe('transformIssueLinks', () => {
 
       const result = await transformIssueLinks(content, workspaceId) as TiptapDoc;
 
-      const paragraph = result.content![0].content![0];
+      const paragraph = result.content![0]!.content![0]!;
       const link = (paragraph.content as TiptapNode[]).find((n: TiptapNode) => n.text === 'issue #77');
       expect(link?.marks).toBeDefined();
     });
@@ -475,7 +475,7 @@ describe('transformIssueLinks', () => {
       const result = await transformIssueLinks(content, workspaceId) as TiptapDoc;
 
       // Should remain plain text
-      const textNode = result.content![0].content![0];
+      const textNode = result.content![0]!.content![0]!;
       expect(textNode.marks).toBeUndefined();
     });
   });
@@ -501,7 +501,7 @@ describe('transformIssueLinks', () => {
 
       const result = await transformIssueLinks(content, workspaceId) as TiptapDoc;
 
-      const nodes = result.content![0].content as TiptapNode[];
+      const nodes = result.content![0]!.content as TiptapNode[];
 
       // Both should be transformed
       expect(nodes.some((n: TiptapNode) => n.text === 'Issue #5' && n.marks)).toBe(true);

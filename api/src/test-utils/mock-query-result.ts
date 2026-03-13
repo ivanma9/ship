@@ -1,29 +1,31 @@
-import type { QueryResult, FieldDef } from 'pg';
+import type { FieldDef } from 'pg';
 
 /**
- * Creates a properly-typed pg.QueryResult for use in Vitest mocks.
- * Eliminates `as any` casts in test files.
+ * Creates a pg.QueryResult-shaped object for use in Vitest mocks.
+ * Returns `any` so it satisfies all overloads of pool.query mock.
  *
  * Usage:
  *   vi.mocked(pool.query).mockResolvedValueOnce(mockQueryResult([{ id: '1' }]));
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function mockQueryResult<T extends Record<string, unknown>>(
   rows: T[],
-  overrides: Partial<QueryResult<T>> = {}
-): QueryResult<T> {
+  overrides: Partial<{ rowCount: number; command: string }> = {}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
   return {
     rows,
-    rowCount: rows.length,
-    command: 'SELECT',
+    rowCount: overrides.rowCount ?? rows.length,
+    command: overrides.command ?? 'SELECT',
     oid: 0,
     fields: [] as FieldDef[],
-    ...overrides,
   };
 }
 
 /**
  * Shorthand for an empty result set.
  */
-export function mockEmptyResult(): QueryResult<Record<string, unknown>> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function mockEmptyResult(): any {
   return mockQueryResult([]);
 }

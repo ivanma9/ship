@@ -44,7 +44,8 @@ describe('Issues History API', () => {
     // Reset mockClient defaults after clearAllMocks
     mockClient.query.mockResolvedValue(mockEmptyResult());
     mockClient.release.mockReturnValue(undefined);
-    vi.mocked(pool).connect = vi.fn().mockResolvedValue(mockClient) as unknown as typeof pool.connect;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(pool).connect = vi.fn().mockResolvedValue(mockClient) as any;
     app = express();
     app.use(express.json());
     app.use('/api/issues', issuesRouter);
