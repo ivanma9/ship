@@ -14,7 +14,7 @@ vi.mock('@/hooks/useAutoSave', () => ({
   }) => {
     capturedOnFailure = opts.onFailure;
     capturedOnSuccess = opts.onSuccess;
-    const fn = vi.fn() as ReturnType<typeof import('@/hooks/useAutoSave').useAutoSave>;
+    const fn = vi.fn() as unknown as ReturnType<typeof import('@/hooks/useAutoSave').useAutoSave>;
     fn.flush = vi.fn().mockResolvedValue(undefined);
     return fn;
   },
