@@ -13,7 +13,7 @@
 | /issues | All cells announced with column header | — | | | | |
 | /issues | Row actions have meaningful labels | — | | | | |
 | /issues | Empty state announced | — | | | | |
-| /issues | Keyboard traversal complete (all initially loaded rows) | — | | | | |
+| /issues | Keyboard traversal complete (all initially loaded rows) | Pending manual verification — to be filled by developer before merge | | | | ARIA grid attributes added (aria-rowcount, aria-colcount, aria-rowindex, aria-colindex); ArrowLeft/Right cell navigation added in SelectableList |
 | /projects | No serious contrast violations | — | | | | |
 | /projects | Keyboard traversal complete | — | | | | |
 | /programs | No serious contrast violations | — | | | | |

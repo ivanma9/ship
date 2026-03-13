@@ -1351,15 +1351,26 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
   // Apply reduced opacity to out-of-context issues
   const cellClass = isOutOfContext ? 'opacity-50' : '';
 
+  // Compute aria-colindex for each cell (1-based; col 1 is the checkbox cell).
+  // We count how many columns before each key are visible to get the DOM position.
+  const COLUMN_ORDER = ['id', 'title', 'status', 'source', 'program', 'sprint', 'priority', 'assignee', 'updated'] as const;
+  const colIndexMap: Partial<Record<typeof COLUMN_ORDER[number], number>> = {};
+  let colCounter = 2; // col 1 is checkbox (selectable); data cols start at 2
+  for (const key of COLUMN_ORDER) {
+    if (visibleColumns.has(key)) {
+      colIndexMap[key] = colCounter++;
+    }
+  }
+
   return (
     <>
       {visibleColumns.has('id') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['id']}>
           #{issue.ticket_number}
         </td>
       )}
       {visibleColumns.has('title') && (
-        <td className={cn("px-4 py-3 text-sm text-foreground", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-foreground", cellClass)} role="gridcell" aria-colindex={colIndexMap['title']}>
           <div className="flex items-center gap-2">
             <span className="truncate">{issue.title}</span>
             {isOutOfContext && onAddToContext && (
@@ -1381,22 +1392,22 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
         </td>
       )}
       {visibleColumns.has('status') && (
-        <td className={cn("px-4 py-3", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['status']}>
           <StatusBadge state={issue.state} />
         </td>
       )}
       {visibleColumns.has('source') && (
-        <td className={cn("px-4 py-3", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['source']}>
           <SourceBadge source={issue.source} />
         </td>
       )}
       {visibleColumns.has('program') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['program']}>
           {getProgramTitle(issue) || '—'}
         </td>
       )}
       {visibleColumns.has('sprint') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['sprint']}>
           {sprints && onSprintChange ? (
             <InlineWeekSelector
               value={getSprintId(issue)}
@@ -1409,12 +1420,12 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
         </td>
       )}
       {visibleColumns.has('priority') && (
-        <td className={cn("px-4 py-3", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['priority']}>
           <PriorityBadge priority={issue.priority} />
         </td>
       )}
       {visibleColumns.has('assignee') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass, issue.assignee_archived && "opacity-50")} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass, issue.assignee_archived && "opacity-50")} role="gridcell" aria-colindex={colIndexMap['assignee']}>
           {issue.assignee_name ? (
             <>
               {issue.assignee_name}{issue.assignee_archived && ' (archived)'}
@@ -1423,7 +1434,7 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
         </td>
       )}
       {visibleColumns.has('updated') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['updated']}>
           {issue.updated_at ? formatDate(issue.updated_at) : '-'}
         </td>
       )}
