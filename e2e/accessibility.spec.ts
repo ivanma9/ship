@@ -291,27 +291,32 @@ test.describe('Accessibility - ARIA Grid Keyboard Traversal', () => {
     await expect(firstDataCell).toBeVisible()
     await expect(firstDataCell).toHaveAttribute('aria-colindex')
 
+    // Require at least 3 data rows so we can verify ArrowDown moves between two distinct rows.
+    // Seed data must provide at least 3 issues. Run: pnpm db:seed
+    const dataRowCount = await page.locator('[role="row"][aria-rowindex]').count()
+    // aria-rowindex includes the header (rowindex=1) plus data rows (rowindex>=2)
+    expect(dataRowCount, 'Seed data should provide at least 3 data rows (aria-rowindex 2, 3, 4+). Run: pnpm db:seed').toBeGreaterThanOrEqual(3)
+
     // Tab into the grid — focus the grid container
     await grid.focus()
     await expect(grid).toBeFocused()
 
-    // Press ArrowDown to move focus into first data row
+    // Press ArrowDown once: focus moves to first data row (aria-rowindex="2")
     await page.keyboard.press('ArrowDown')
-    // The grid should have focus-within on a row after ArrowDown
-    const hasFocusedRow = await page.locator('[role="row"]:focus, [role="row"][data-focused="true"]').count()
-    expect(hasFocusedRow).toBeGreaterThan(0)
+    const firstFocusedRow = page.locator('[role="row"][data-focused="true"]')
+    await expect(firstFocusedRow).toBeVisible()
+    await expect(firstFocusedRow).toHaveAttribute('aria-rowindex', '2')
 
-    // Press ArrowDown again to move to next row
+    // Press ArrowDown again: focus must move to second data row (aria-rowindex="3")
     await page.keyboard.press('ArrowDown')
-    // Row with aria-rowindex="3" (or at least rowindex >= 3) should be focused
-    const focusedRow = page.locator('[role="row"][data-focused="true"]')
-    await expect(focusedRow).toBeVisible()
+    const secondFocusedRow = page.locator('[role="row"][data-focused="true"]')
+    await expect(secondFocusedRow).toBeVisible()
+    await expect(secondFocusedRow).toHaveAttribute('aria-rowindex', '3')
 
-    // Press ArrowUp to go back up
+    // Press ArrowUp: focus must return to first data row (aria-rowindex="2")
     await page.keyboard.press('ArrowUp')
-    // Still should have a focused row
-    const focusedRowAfterUp = page.locator('[role="row"][data-focused="true"]')
-    await expect(focusedRowAfterUp).toBeVisible()
+    const rowAfterUp = page.locator('[role="row"][data-focused="true"]')
+    await expect(rowAfterUp).toHaveAttribute('aria-rowindex', '2')
 
     // Press Enter to activate the focused row — must invoke primary action (navigate to document)
     await page.keyboard.press('Enter')

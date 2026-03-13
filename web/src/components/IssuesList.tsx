@@ -931,14 +931,20 @@ export function IssuesList({
     forceUpdate(n => n + 1);
   }, []);
 
-  // Global keyboard navigation for j/k and Enter
+  // Hoisted unconditionally to satisfy rules-of-hooks; passed to useGlobalListNavigation
+  // only when not in list view (in list view, the ARIA grid's own Enter handler owns navigation).
+  const handleGlobalEnter = useCallback((focusedId: string) => {
+    navigate(`/documents/${focusedId}`);
+  }, [navigate]);
+
+  // Global keyboard navigation for j/k and Enter.
+  // When in list view, the ARIA grid's own Enter handler (via useSelection onEnter) owns
+  // navigation — suppress onEnter here to avoid a double-navigate race condition.
   useGlobalListNavigation({
     selection: selectionRef.current,
     selectionRef: selectionRef,
     enabled: enableKeyboardNavigation && viewMode === 'list',
-    onEnter: useCallback((focusedId: string) => {
-      navigate(`/documents/${focusedId}`);
-    }, [navigate]),
+    onEnter: viewMode === 'list' ? undefined : handleGlobalEnter,
   });
 
   // Kanban checkbox click handler

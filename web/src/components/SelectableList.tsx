@@ -93,6 +93,11 @@ export function SelectableList<T extends { id: string }>({
     onSelectionChange?.(selection.selectedIds, selection);
   }, [selection.selectedIds, selection.focusedId, onSelectionChange]);
 
+  // Reset column focus when the focused row changes so ArrowLeft/Right starts fresh
+  useEffect(() => {
+    setFocusedColIndex(null);
+  }, [selection.focusedId]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent, item: T) => {
     e.preventDefault();
     const itemId = getItemId(item);
