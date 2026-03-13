@@ -46,22 +46,9 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
 
-      - name: Pull Vercel project settings
-        run: vercel pull --yes --token ${{ secrets.VERCEL_TOKEN }}
-        working-directory: web
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Build for Vercel
-        run: vercel build --prod --token ${{ secrets.VERCEL_TOKEN }}
-        working-directory: web
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
       - name: Deploy to Vercel (production)
-        run: vercel deploy --prod --prebuilt --token ${{ secrets.VERCEL_TOKEN }}
+        # Deploy the pre-built dist/ directly — skips Vercel's build pipeline
+        run: vercel deploy dist --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
         working-directory: web
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
