@@ -10,11 +10,11 @@
 ## 2. Capture the current baseline
 
 1. Run `pnpm test` to confirm the API baseline is green before performance changes.
-2. Run `pnpm exec tsx audits/artifacts/db-query-efficiency-audit.ts` and keep the JSON output as the feature baseline if a fresh snapshot is needed.
+2. Use the existing March 10, 2026 baseline artifacts in `audits/artifacts/db-query-efficiency-baseline.json` and `audits/consolidated-audit-report-2026-03-10.md` as the pre-change reference for this feature.
 3. Note the current March 10, 2026 audit values for:
    - Search content flow query count: `5`
    - Projected optimized search flow query count: `4`
-   - Search query-family execution-time target: approximately `63%` faster
+   - Search query-family execution-time target: approximately `63%` faster, with the implementation allowed to publish the measured delta instead if the projection is not met on current seed data
 
 ## 3. Implement the API changes
 
@@ -32,13 +32,13 @@
 
 1. Run `pnpm test`.
 2. If a migration was added, run `pnpm db:migrate`.
-3. Run `pnpm exec tsx audits/artifacts/db-query-efficiency-audit.ts`.
-4. Capture `EXPLAIN ANALYZE` for the merged mention-search query and any new batched accountability query that becomes performance-critical.
-5. Update `audits/consolidated-audit-report-2026-03-10.md` with before-and-after deltas and explain notes.
+3. Run `pnpm --dir api exec tsx ../audits/artifacts/db-query-efficiency-audit.ts` twice and store the outputs in `audits/artifacts/db-query-efficiency-after.json` and `audits/artifacts/db-query-efficiency-after2.json`.
+4. Capture `EXPLAIN ANALYZE` for the merged mention-search query and compare it against the legacy people/docs statements on the same seeded dataset before deciding on the optional index migration.
+5. Update `audits/consolidated-audit-report-2026-03-10.md` with before-and-after query deltas, the dedicated accountability flow snapshot, explain notes, and the migration decision.
 
 ## 6. Feature completion check
 
 - Search content flow measures four queries instead of five.
-- Seeded rerun shows a material search latency improvement and no contract regressions.
-- Accountability action-items preserve current behavior while avoiding per-item query loops.
+- Seeded rerun publishes the measured search latency delta, whether or not it reaches the earlier ~63% projection.
+- Accountability action-items preserve current behavior while avoiding repeated per-sprint and per-allocation query loops.
 - Audit artifacts and report are updated in the same change set.

@@ -410,75 +410,90 @@ Method: Instrumented `pool.query` at the API layer and replayed five authenticat
 
 ### Summary
 
-- Baseline query counts were captured for five core flows.
-- Two concrete inefficiencies were found: an N+1 pattern in action-items and an extra round-trip in mention search.
-- Proposed changes are **not applied yet**. If applied, they reduce Search content from 5 to 4 queries (20%).
-- In the audited search query family, estimated execution time drops from 0.979 ms to 0.360 ms (~63.2% faster).
+- Baseline query counts were captured on March 10, 2026 and the optimized flows were rerun on March 13, 2026 using the same audit harness.
+- The mention-search change is applied and reduces Search content from 5 queries to 4 queries in both post-change reruns.
+- The accountability batching change is applied and the dedicated `GET /api/accountability/action-items` audit flow now completes with 13 queries, `repeatedQueryCount = 2`, and `nPlusOneDetected = false`.
+- On current seeded data, the merged search query does **not** reproduce the earlier projected ~63% speedup; the measured same-seed `EXPLAIN ANALYZE` delta is 0.719 ms -> 0.702 ms (~2.4% faster).
+- The optional title-search index migration was **not** added because the 4-query target is met and the seeded reruns show stable query counts across repeated runs.
 
 ### Audit Deliverable
 
-| User Flow         | Total Queries | Slowest Query (ms) | N+1 Detected? |
-| ----------------- | ------------- | ------------------ | ------------- |
-| Load main page    | 54            | 3.39 ms            | Yes           |
-| View a document   | 16            | 2.29 ms            | No            |
-| List issues       | 17            | 2.40 ms            | No            |
-| Load sprint board | 14            | 2.24 ms            | No            |
-| Search content    | 5             | 1.00 ms            | No            |
+| User Flow                    | Baseline Queries | After Queries | After2 Queries | Notes |
+| ---------------------------- | ---------------- | ------------- | -------------- | ----- |
+| Load main page               | 54               | 53            | 53             | One-query reduction preserved; broader page still has other repeated-query hotspots outside this feature |
+| View a document              | 16               | 16            | 16             | Unchanged |
+| List issues                  | 17               | 17            | 17             | Unchanged |
+| Load sprint board            | 14               | 14            | 14             | Unchanged |
+| Search content               | 5                | 4             | 4              | Target met; stable across reruns |
+| Accountability action-items  | N/A              | 13            | 13             | Dedicated flow added in the post-change harness; repeated-query heuristic cleared (`2`, not N+1) |
 
 ### Inefficiencies Identified
 
-1. `GET /api/accountability/action-items` has N+1 behavior in `checkMissingStandups` and `checkSprintAccountability` (`api/src/services/accountability.ts`).
-   - Each sprint triggered separate queries for standup existence, last standup date, and issue counts.
-2. `GET /api/search/mentions` executes separate database queries for people and documents (`api/src/routes/search.ts`).
-   - This adds one extra query to each search request.
-3. Search by title uses `%ILIKE%` on `documents.title`.
-   - `EXPLAIN ANALYZE` shows a sequential scan on content documents for this dataset.
+1. `GET /api/accountability/action-items` previously repeated standup and sprint-support lookups per sprint and per allocation in `api/src/services/accountability.ts`.
+   - The updated implementation now batches standup status, sprint issue counts, and weekly plan/retro fetches while preserving derived item behavior.
+2. `GET /api/search/mentions` previously issued separate database queries for people and documents in `api/src/routes/search.ts`.
+   - The updated implementation now uses one CTE + `UNION ALL` statement and reconstructs the existing `{ people, documents }` response in TypeScript.
+3. Search by title still uses `%ILIKE%` on `documents.title`.
+   - Same-seed `EXPLAIN ANALYZE` continues to show a sequential scan for the document portion of the search query family, but the observed execution time remains low enough that the optional trigram index was deferred.
 
-### Projected Metrics (If Applied)
+### Measured Metrics
 
-| User Flow         | Total Queries (Before) | Total Queries (Projected) | Improvement |
-| ----------------- | ---------------------- | ------------------------- | ----------- |
-| Load main page    | 54                     | 53                        | 1.9%        |
-| View a document   | 16                     | 16                        | 0.0%        |
-| List issues       | 17                     | 17                        | 0.0%        |
-| Load sprint board | 14                     | 14                        | 0.0%        |
-| Search content    | 5                      | 4                         | **20.0%**   |
+| User Flow                   | Total Queries (Before) | Total Queries (After) | Improvement |
+| --------------------------- | ---------------------- | --------------------- | ----------- |
+| Load main page              | 54                     | 53                    | 1.9%        |
+| View a document             | 16                     | 16                    | 0.0%        |
+| List issues                 | 17                     | 17                    | 0.0%        |
+| Load sprint board           | 14                     | 14                    | 0.0%        |
+| Search content              | 5                      | 4                     | **20.0%**   |
+| Accountability action-items | N/A                    | 13                    | Dedicated direct measurement added after implementation |
 
-Target status: **Would be met if applied** (20% reduction in one audited flow: Search content).
+Target status:
+
+- **Query-count target met** for Search content (`5 -> 4`).
+- **Behavior-preservation target met** in targeted API tests for search and accountability.
+- **Accountability batching target met** for repeated-query elimination (`nPlusOneDetected = false` in the dedicated action-items flow).
+- **Original ~63% search latency projection not reproduced** on current seeded data; the measured delta is published below instead of reusing the projection.
 
 Calculation:
 
 - Baseline Search content flow: 5 queries
-- Projected Search content flow: 4 queries
+- Measured Search content flow: 4 queries
 - Reduction: `(5 - 4) / 5 = 0.20` -> **20%**
 
 ### EXPLAIN ANALYZE Snapshot
 
 Query family: Search content (`/api/search/mentions?q=pro`)
 
-#### Before (Two DB Queries)
+#### Before (Legacy two-query path, rerun on current seeded data)
 
-- `old_people`: Execution Time **0.251 ms**
-- `old_docs`: Execution Time **0.728 ms**
-- Combined execution time: **0.979 ms**
+- `old_people`: Execution Time **0.095 ms**
+- `old_docs`: Execution Time **0.624 ms**
+- Combined execution time: **0.719 ms**
 
 Plan highlights:
 
-- `old_people`: Bitmap Heap Scan on `documents` filtered by `document_type='person'`
+- `old_people`: Index Scan using `idx_documents_active`
 - `old_docs`: Seq Scan on `documents` with `title ILIKE '%pro%'`
 
-#### After (Single Combined DB Query)
+#### After (Single combined DB query, current implementation)
 
-- `new_combined`: Execution Time **0.360 ms**
+- `new_combined`: Execution Time **0.702 ms**
 
 Plan highlights:
 
 - Single `Append` plan with `people` and `content_docs` subqueries
 - Same filter semantics and per-subquery limits preserved
+- Document branch still uses a sequential scan on this seeded dataset
 
 Execution-time delta (query family):
 
-- **0.979 ms -> 0.360 ms (~63.2% faster)**
+- **0.719 ms -> 0.702 ms (~2.4% faster)**
+
+Rerun stability notes:
+
+- `Search content` measured 4 queries in both post-change audit snapshots.
+- `Accountability action-items` measured 13 queries with `repeatedQueryCount = 2` in both post-change audit snapshots.
+- No plan instability was observed across the two post-change harness runs for the targeted flows.
 
 ### Files Changed
 
@@ -486,16 +501,16 @@ Execution-time delta (query family):
 - `audits/artifacts/db-query-efficiency-baseline.json`
 - `audits/artifacts/db-query-efficiency-after.json`
 - `audits/artifacts/db-query-efficiency-after2.json`
-- `audits/database-query-efficiency-audit-2026-03-10.md`
+- `audits/consolidated-audit-report-2026-03-10.md`
 
 ### Improvement Plan
 
 - **Goal:** Reduce query count and execution time for audited flows.
-- **Proposed changes (not applied):**
-  - In `api/src/services/accountability.ts`: Batch per-sprint standup checks and last-standup lookups into set-based queries; batch sprint issue counts instead of querying once per sprint.
-  - In `api/src/routes/search.ts`: Merge people and document search into one SQL statement (CTEs + `UNION ALL`) while preserving per-source limits.
-- **Target:** 20% reduction in Search content flow (5 → 4 queries); ~63% faster execution for that query family.
-- **Exit criterion:** Re-run instrumented flows and confirm projected metrics.
+- **Applied changes:**
+  - In `api/src/services/accountability.ts`: Batched standup checks, sprint issue counts, and weekly plan/retro lookups.
+  - In `api/src/routes/search.ts`: Merged people and document search into one SQL statement (CTEs + `UNION ALL`) while preserving per-source limits.
+- **Migration decision:** No `038_query_efficiency_indexes.sql` was added because repeated seeded reruns were stable and the current query family remained fast enough without extra index scope.
+- **Residual risk:** The document-search branch still uses a sequential scan for `%ILIKE%` title search. Revisit the optional trigram index only if production-like seeded data grows enough to make this path materially slower.
 
 ---
 

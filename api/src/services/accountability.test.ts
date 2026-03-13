@@ -363,4 +363,113 @@ describe('Accountability Service', () => {
       expect(planItems[0]?.weekNumber).toBe(2);
     });
   });
+
+  describe('batched query behavior', () => {
+    it('batches standup status lookups across active sprints', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-01-08T12:00:00Z'));
+
+      mockSetupQueries()
+        // active sprints for standups
+        .mockResolvedValueOnce({
+          rows: [
+            { id: 'sprint-1', title: 'Week 2 Alpha', properties: { sprint_number: 2 }, issue_count: '2' },
+            { id: 'sprint-2', title: 'Week 2 Beta', properties: { sprint_number: 2 }, issue_count: '1' },
+          ],
+        } as any)
+        // grouped standup status query
+        .mockResolvedValueOnce({
+          rows: [
+            { sprint_id: 'sprint-1', has_standup_today: false, last_standup_date: '2024-01-06' },
+            { sprint_id: 'sprint-2', has_standup_today: true, last_standup_date: '2024-01-08' },
+          ],
+        } as any)
+        // owned sprints
+        .mockResolvedValueOnce({ rows: [] } as any)
+        // changes_requested check
+        .mockResolvedValueOnce({ rows: [] } as any);
+
+      const result = await checkMissingAccountability(userId, workspaceId);
+
+      expect(result.filter((item) => item.type === 'standup')).toHaveLength(1);
+      const standupSqlCalls = vi.mocked(pool.query).mock.calls.filter(([sql]) =>
+        typeof sql === 'string' && sql.includes('BOOL_OR(created_at >= $3::date')
+      );
+      expect(standupSqlCalls).toHaveLength(1);
+    });
+
+    it('batches sprint issue counts across owned sprints', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-01-15T12:00:00Z'));
+      vi.mocked(isBusinessDay).mockReturnValue(false);
+
+      mockSetupQueries()
+        // owned sprints
+        .mockResolvedValueOnce({
+          rows: [
+            { id: 'sprint-1', title: 'Week 1', properties: { sprint_number: 1, status: 'planned' }, project_id: null },
+            { id: 'sprint-2', title: 'Week 2', properties: { sprint_number: 2, status: 'active' }, project_id: null },
+          ],
+        } as any)
+        // grouped issue counts
+        .mockResolvedValueOnce({
+          rows: [{ sprint_id: 'sprint-2', issue_count: '2' }],
+        } as any)
+        // changes_requested check
+        .mockResolvedValueOnce({ rows: [] } as any);
+
+      const result = await checkMissingAccountability(userId, workspaceId);
+
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'week_start', targetId: 'sprint-1' }),
+          expect.objectContaining({ type: 'week_issues', targetId: 'sprint-1' }),
+        ])
+      );
+      expect(result.some((item) => item.type === 'week_issues' && item.targetId === 'sprint-2')).toBe(false);
+
+      const issueCountSqlCalls = vi.mocked(pool.query).mock.calls.filter(([sql]) =>
+        typeof sql === 'string' && sql.includes('GROUP BY da.related_id')
+      );
+      expect(issueCountSqlCalls).toHaveLength(1);
+    });
+
+    it('reuses weekly plan and retro lookups across multiple allocations in the same sprint', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-01-04T12:00:00Z'));
+      vi.mocked(isBusinessDay).mockReturnValue(false);
+
+      mockSetupQueries()
+        // owned sprints
+        .mockResolvedValueOnce({ rows: [] } as any)
+        // current sprint weekly_plan lookup
+        .mockResolvedValueOnce({ rows: [] } as any)
+        // current sprint weekly_retro lookup
+        .mockResolvedValueOnce({ rows: [] } as any)
+        // changes_requested check
+        .mockResolvedValueOnce({ rows: [] } as any);
+
+      vi.mocked(getAllocations)
+        .mockResolvedValueOnce([
+          { projectId: 'project-1', projectName: 'Alpha' },
+          { projectId: 'project-2', projectName: 'Beta' },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const result = await checkMissingAccountability(userId, workspaceId);
+
+      expect(result.filter((item) => item.type === 'weekly_plan')).toHaveLength(2);
+      expect(result.filter((item) => item.type === 'weekly_retro')).toHaveLength(2);
+
+      const planQueryCalls = vi.mocked(pool.query).mock.calls.filter(([sql]) =>
+        typeof sql === 'string' && sql.includes("document_type = 'weekly_plan'")
+      );
+      const retroQueryCalls = vi.mocked(pool.query).mock.calls.filter(([sql]) =>
+        typeof sql === 'string' && sql.includes("document_type = 'weekly_retro'")
+      );
+
+      expect(planQueryCalls).toHaveLength(1);
+      expect(retroQueryCalls).toHaveLength(1);
+    });
+  });
 });

@@ -19,7 +19,7 @@
 
 - [ ] T001 Capture a fresh pre-change query-efficiency baseline with `pnpm exec tsx audits/artifacts/db-query-efficiency-audit.ts` and store the output in `audits/artifacts/db-query-efficiency-baseline.json`
 - [ ] T002 Capture pre-change `EXPLAIN ANALYZE` notes for mention search and accountability hotspot queries in `audits/consolidated-audit-report-2026-03-10.md`
-- [ ] T003 Verify the implementation and validation command sequence in `specs/004-optimize-query-flows/quickstart.md`
+- [X] T003 Verify the implementation and validation command sequence in `specs/004-optimize-query-flows/quickstart.md`
 
 ---
 
@@ -29,9 +29,9 @@
 
 **⚠️ CRITICAL**: No user story work should begin until this phase is complete
 
-- [ ] T004 Add typed query-measurement comparison fields for the updated search and accountability flows in `audits/artifacts/db-query-efficiency-audit.ts`
-- [ ] T005 [P] Add typed merged-row and discriminator helpers for mention-search result reconstruction in `api/src/routes/search.ts`
-- [ ] T006 [P] Add typed batched-row helper interfaces for accountability support queries in `api/src/services/accountability.ts`
+- [X] T004 Add typed before/after flow comparison fields and stable flow labels in `audits/artifacts/db-query-efficiency-audit.ts`
+- [X] T005 [P] Add typed merged-row and discriminator helpers for mention-search result reconstruction in `api/src/routes/search.ts`
+- [X] T006 [P] Add typed batched-row helper interfaces and ID-set helpers for accountability support queries in `api/src/services/accountability.ts`
 
 **Checkpoint**: Baseline instrumentation and shared query-row typing are ready for story implementation
 
@@ -45,15 +45,15 @@
 
 ### Tests for User Story 1
 
-- [ ] T007 [P] [US1] Extend mixed-source, single-source, and empty-result coverage in `api/src/routes/search.test.ts`
-- [ ] T008 [P] [US1] Extend private-document visibility regression coverage for merged mention search in `api/src/routes/documents-visibility.test.ts`
+- [X] T007 [P] [US1] Extend mixed-source, single-source, empty-result, and per-source limit coverage in `api/src/routes/search.test.ts`
+- [X] T008 [P] [US1] Extend private-document and admin-visibility regression coverage for merged mention search in `api/src/routes/documents-visibility.test.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] Replace the dual-query mention-search implementation with one CTE plus `UNION ALL` statement in `api/src/routes/search.ts`
-- [ ] T010 [US1] Reconstruct merged mention-search rows back into the existing `people` and `documents` contract in `api/src/routes/search.ts`
-- [ ] T011 [US1] Capture post-change mention-search `EXPLAIN ANALYZE` findings and record the index decision in `audits/consolidated-audit-report-2026-03-10.md`
-- [ ] T012 [US1] If the merged search query remains unstable under seeded load, add targeted title-search support in `api/src/db/migrations/038_query_efficiency_indexes.sql`
+- [X] T009 [US1] Replace the dual-query mention-search implementation with one CTE plus `UNION ALL` statement that preserves independent source filtering, ordering, and limits in `api/src/routes/search.ts`
+- [X] T010 [US1] Reconstruct merged mention-search rows back into the existing `people` and `documents` contract in `api/src/routes/search.ts`
+- [X] T011 [US1] Capture post-change mention-search `EXPLAIN ANALYZE` findings and record the index decision in `audits/consolidated-audit-report-2026-03-10.md`
+- [ ] T012 [US1] Add targeted title-search support only if repeated seeded runs or `EXPLAIN ANALYZE` show the merged search query misses the latency target or uses unstable plans in `api/src/db/migrations/038_query_efficiency_indexes.sql`
 
 **Checkpoint**: User Story 1 is complete when mention search remains contract-stable and the audited search-content flow drops to four queries
 
@@ -67,15 +67,15 @@
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Extend batched standup, issue-count, and missing-related-record regression coverage in `api/src/services/accountability.test.ts`
-- [ ] T014 [P] [US2] Add action-item response-shape and urgency-order regression coverage in `api/src/routes/accountability.test.ts`
+- [X] T013 [P] [US2] Extend batched standup, sprint issue-count, weekly-doc reuse, and missing-related-record regression coverage in `api/src/services/accountability.test.ts`
+- [X] T014 [P] [US2] Create route-level action-item response-shape and urgency-order regression coverage in `api/src/routes/accountability.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T015 [US2] Replace standup existence and last-standup per-sprint loops with grouped queries in `api/src/services/accountability.ts`
-- [ ] T016 [US2] Replace per-sprint issue-count lookups with grouped sprint issue counts in `api/src/services/accountability.ts`
-- [ ] T017 [US2] Replace per-allocation weekly-plan and weekly-retro existence lookups with batched fetches in `api/src/services/accountability.ts`
-- [ ] T018 [US2] Preserve synthetic item mapping, urgency sorting, and route compatibility after batching in `api/src/routes/accountability.ts`
+- [X] T015 [US2] Replace standup existence and last-standup per-sprint loops with grouped queries while keeping message generation and omission behavior unchanged in `api/src/services/accountability.ts`
+- [X] T016 [US2] Replace per-sprint issue-count lookups with grouped sprint issue counts while keeping sprint date and status checks unchanged in `api/src/services/accountability.ts`
+- [X] T017 [US2] Batch weekly-plan and weekly-retro lookups inside `checkWeeklyPersonAccountability()` so one `(workspace, person, sprint)` fetch is reused across all allocations in `api/src/services/accountability.ts`
+- [X] T018 [US2] Preserve synthetic action-item mapping, urgency sorting, due-date handling, and route compatibility after service batching in `api/src/routes/accountability.ts`
 
 **Checkpoint**: User Story 2 is complete when accountability action items are behaviorally unchanged and no longer rely on avoidable per-item query loops
 
@@ -89,13 +89,13 @@
 
 ### Tests for User Story 3
 
-- [ ] T019 [P] [US3] Add before-and-after flow comparison coverage for search and accountability metrics in `audits/artifacts/db-query-efficiency-audit.ts`
+- [X] T019 [P] [US3] Add before-and-after flow comparison coverage for search and accountability metrics in `audits/artifacts/db-query-efficiency-audit.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T020 [US3] Run the seeded post-change audit harness and store the first after snapshot in `audits/artifacts/db-query-efficiency-after.json`
-- [ ] T021 [US3] Run the seeded audit harness a second time to confirm plan stability and store the follow-up snapshot in `audits/artifacts/db-query-efficiency-after2.json`
-- [ ] T022 [US3] Publish before-and-after query counts, execution-time deltas, `EXPLAIN ANALYZE` notes, and migration rationale in `audits/consolidated-audit-report-2026-03-10.md`
+- [X] T020 [US3] Run the seeded post-change audit harness and store the first after snapshot in `audits/artifacts/db-query-efficiency-after.json`
+- [X] T021 [US3] Run the seeded audit harness a second time to confirm plan stability and store the follow-up snapshot in `audits/artifacts/db-query-efficiency-after2.json`
+- [X] T022 [US3] Publish before-and-after query counts, execution-time deltas, `EXPLAIN ANALYZE` notes, and migration rationale in `audits/consolidated-audit-report-2026-03-10.md`
 
 **Checkpoint**: User Story 3 is complete when the audit artifacts and report prove the performance gains and confirm no behavior regressions
 
@@ -105,8 +105,8 @@
 
 **Purpose**: Final validation and documentation updates that cut across all stories
 
-- [ ] T023 [P] Refresh final verification steps and migration notes in `specs/004-optimize-query-flows/quickstart.md`
-- [ ] T024 Run final regression and performance validation commands referenced in `specs/004-optimize-query-flows/quickstart.md`
+- [X] T023 [P] Refresh final verification steps, current baseline notes, and conditional migration guidance in `specs/004-optimize-query-flows/quickstart.md`
+- [X] T024 Run final regression and performance validation commands referenced in `specs/004-optimize-query-flows/quickstart.md`
 
 ---
 
@@ -131,7 +131,7 @@
 
 - Test tasks precede implementation tasks
 - Query-shape changes precede `EXPLAIN ANALYZE` capture
-- Migration task `T012` is conditional and only executes if explain evidence justifies it
+- Migration task `T012` is conditional and only executes if repeated measurement or explain evidence justifies it
 - Audit publication follows successful reruns
 
 ## Parallel Opportunities
@@ -145,22 +145,22 @@
 ## Parallel Example: User Story 1
 
 ```bash
-Task: "Extend mixed-source, single-source, and empty-result coverage in api/src/routes/search.test.ts"
-Task: "Extend private-document visibility regression coverage for merged mention search in api/src/routes/documents-visibility.test.ts"
+Task: "Extend mixed-source, single-source, empty-result, and per-source limit coverage in api/src/routes/search.test.ts"
+Task: "Extend private-document and admin-visibility regression coverage for merged mention search in api/src/routes/documents-visibility.test.ts"
 ```
 
 ## Parallel Example: User Story 2
 
 ```bash
-Task: "Extend batched standup, issue-count, and missing-related-record regression coverage in api/src/services/accountability.test.ts"
-Task: "Add action-item response-shape and urgency-order regression coverage in api/src/routes/accountability.test.ts"
+Task: "Extend batched standup, sprint issue-count, weekly-doc reuse, and missing-related-record regression coverage in api/src/services/accountability.test.ts"
+Task: "Create route-level action-item response-shape and urgency-order regression coverage in api/src/routes/accountability.test.ts"
 ```
 
 ## Parallel Example: User Story 3
 
 ```bash
 Task: "Add before-and-after flow comparison coverage for search and accountability metrics in audits/artifacts/db-query-efficiency-audit.ts"
-Task: "Refresh final verification steps and migration notes in specs/004-optimize-query-flows/quickstart.md"
+Task: "Refresh final verification steps, current baseline notes, and conditional migration guidance in specs/004-optimize-query-flows/quickstart.md"
 ```
 
 ## Implementation Strategy
@@ -189,4 +189,4 @@ Task: "Refresh final verification steps and migration notes in specs/004-optimiz
 - `[P]` tasks touch different files or can be executed without waiting on each other
 - All tasks include exact file paths and use the required checklist format
 - The suggested MVP scope is **User Story 1 only**
-- Task `T012` is intentionally conditional because the plan makes the migration dependent on explain and rerun evidence
+- `api/src/routes/accountability.test.ts` does not exist yet, so `T014` intentionally creates that regression surface

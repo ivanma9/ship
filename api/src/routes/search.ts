@@ -6,6 +6,31 @@ import { isWorkspaceAdmin } from '../middleware/visibility.js';
 type RouterType = ReturnType<typeof Router>;
 export const searchRouter: RouterType = Router();
 
+type MentionSearchSource = 'person' | 'document';
+
+type MentionSearchRow = {
+  source_type: MentionSearchSource;
+  id: string;
+  name: string | null;
+  title: string | null;
+  document_type: 'person' | 'wiki' | 'issue' | 'project' | 'program';
+  visibility: string | null;
+  source_order: string | number;
+};
+
+type MentionPersonResult = {
+  id: string;
+  name: string;
+  document_type: 'person';
+};
+
+type MentionDocumentResult = {
+  id: string;
+  title: string;
+  document_type: 'wiki' | 'issue' | 'project' | 'program';
+  visibility: string | null;
+};
+
 // SECURITY: Escape SQL LIKE pattern special characters to prevent wildcard injection
 // This prevents users from using % and _ to match arbitrary patterns
 function escapeLikePattern(str: string): string {
@@ -26,50 +51,110 @@ searchRouter.get('/mentions', authMiddleware, async (req: Request, res: Response
     // Check if user is admin for visibility filtering
     const isAdmin = await isWorkspaceAdmin(userId, workspaceId);
 
-    // Search for people (person documents linked via properties.user_id)
-    // Person documents are always workspace-visible, so no visibility filter needed
-    const peopleResult = await pool.query(
-      `SELECT
-         d.id::text as id,
-         d.title as name,
-         'person' as document_type
-       FROM documents d
-       WHERE d.workspace_id = $1
-         AND d.document_type = 'person'
-         AND d.archived_at IS NULL
-         AND d.deleted_at IS NULL
-         AND d.title ILIKE $2
-       ORDER BY d.title ASC
-       LIMIT 5`,
-      [workspaceId, `%${sanitizedQuery}%`]
-    );
-
-    // Search for other documents (wiki, issue, project, program)
-    // Filter by visibility: workspace docs, user's private docs, or all if admin
-    const documentsResult = await pool.query(
-      `SELECT id, title, document_type, visibility
-       FROM documents
-       WHERE workspace_id = $1
-         AND document_type IN ('wiki', 'issue', 'project', 'program')
-         AND deleted_at IS NULL
-         AND title ILIKE $2
-         AND (visibility = 'workspace' OR created_by = $3 OR $4 = TRUE)
-       ORDER BY
-         CASE document_type
-           WHEN 'issue' THEN 1
-           WHEN 'wiki' THEN 2
-           WHEN 'project' THEN 3
-           WHEN 'program' THEN 4
-           ELSE 5
-         END,
-         updated_at DESC
-       LIMIT 10`,
+    const mentionResult = await pool.query<MentionSearchRow>(
+      `WITH people_matches AS (
+         SELECT
+           'person'::text AS source_type,
+           person_rows.id,
+           person_rows.name,
+           NULL::text AS title,
+           'person'::text AS document_type,
+           NULL::text AS visibility,
+           ROW_NUMBER() OVER (ORDER BY person_rows.name ASC, person_rows.id ASC) AS source_order
+         FROM (
+           SELECT
+             d.id::text AS id,
+             d.title AS name
+           FROM documents d
+           WHERE d.workspace_id = $1
+             AND d.document_type = 'person'
+             AND d.archived_at IS NULL
+             AND d.deleted_at IS NULL
+             AND d.title ILIKE $2
+           ORDER BY d.title ASC, d.id ASC
+           LIMIT 5
+         ) person_rows
+       ),
+       document_matches AS (
+         SELECT
+           'document'::text AS source_type,
+           document_rows.id,
+           NULL::text AS name,
+           document_rows.title,
+           document_rows.document_type,
+           document_rows.visibility,
+           ROW_NUMBER() OVER (
+             ORDER BY document_rows.type_rank ASC, document_rows.updated_at DESC, document_rows.id ASC
+           ) AS source_order
+         FROM (
+           SELECT
+             d.id::text AS id,
+             d.title,
+             d.document_type::text AS document_type,
+             d.visibility::text AS visibility,
+             d.updated_at,
+             CASE d.document_type
+               WHEN 'issue' THEN 1
+               WHEN 'wiki' THEN 2
+               WHEN 'project' THEN 3
+               WHEN 'program' THEN 4
+               ELSE 5
+             END AS type_rank
+           FROM documents d
+           WHERE d.workspace_id = $1
+             AND d.document_type IN ('wiki', 'issue', 'project', 'program')
+             AND d.deleted_at IS NULL
+             AND d.archived_at IS NULL
+             AND d.title ILIKE $2
+             AND (d.visibility = 'workspace' OR d.created_by = $3 OR $4 = TRUE)
+           ORDER BY
+             type_rank ASC,
+             d.updated_at DESC,
+             d.id ASC
+           LIMIT 10
+         ) document_rows
+       )
+       SELECT source_type, id, name, title, document_type, visibility, source_order
+       FROM people_matches
+       UNION ALL
+       SELECT source_type, id, name, title, document_type, visibility, source_order
+       FROM document_matches
+       ORDER BY source_type ASC, source_order ASC`,
       [workspaceId, `%${sanitizedQuery}%`, userId, isAdmin]
     );
 
+    const people: MentionPersonResult[] = [];
+    const documents: MentionDocumentResult[] = [];
+
+    for (const row of mentionResult.rows) {
+      if (row.source_type === 'person') {
+        if (!row.name) {
+          continue;
+        }
+
+        people.push({
+          id: row.id,
+          name: row.name,
+          document_type: 'person',
+        });
+        continue;
+      }
+
+      if (!row.title) {
+        continue;
+      }
+
+      documents.push({
+        id: row.id,
+        title: row.title,
+        document_type: row.document_type as MentionDocumentResult['document_type'],
+        visibility: row.visibility,
+      });
+    }
+
     res.json({
-      people: peopleResult.rows,
-      documents: documentsResult.rows,
+      people,
+      documents,
     });
   } catch (error) {
     console.error('Error searching mentions:', error);
