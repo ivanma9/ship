@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && VITE_API_URL= vite build",
-    "build:analyze": "tsc && VITE_API_URL= BUNDLE_ANALYZE=true vite build",
+    "build": "tsc && vite build",
+    "build:analyze": "tsc && BUNDLE_ANALYZE=true vite build",
     "bundle:size": "node scripts/record-bundle-size.mjs",
     "analyze": "pnpm run build:analyze && pnpm run bundle:size",
     "preview": "vite preview",

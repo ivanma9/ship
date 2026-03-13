@@ -1,0 +1,7 @@
+{
+  "buildCommand": "pnpm build:shared && pnpm --filter web build",
+  "outputDirectory": "web/dist",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
