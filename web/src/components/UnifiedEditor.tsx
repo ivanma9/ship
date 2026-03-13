@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Editor } from '@/components/Editor';
+import { EditorSkeleton } from '@/components/ui/EditorSkeleton';
+import { LazyErrorBoundary } from '@/components/ui/LazyErrorBoundary';
+
+const Editor = lazy(() => import('@/components/Editor').then(m => ({ default: m.Editor })));
 import { PropertiesPanel } from '@/components/sidebars/PropertiesPanel';
 import { WeeklyReviewSubNav } from '@/components/review/WeeklyReviewSubNav';
 import { useWeeklyReviewActions } from '@/hooks/useWeeklyReviewActions';
@@ -563,31 +566,35 @@ export function UnifiedEditor({
   }, [weeklyReviewState]);
 
   return (
-    <Editor
-      documentId={document.id}
-      userName={user.name}
-      initialTitle={document.title}
-      onTitleChange={isTitleReadOnly ? undefined : handleTitleChange}
-      onTitleBlur={isTitleReadOnly ? undefined : handleTitleBlur}
-      titleReadOnly={isTitleReadOnly}
-      onBack={onBack}
-      backLabel={backLabel}
-      onDelete={onDelete}
-      roomPrefix={effectiveRoomPrefix}
-      placeholder={effectivePlaceholder}
-      onCreateSubDocument={onCreateSubDocument}
-      onNavigateToDocument={handleNavigateToDocument}
-      onDocumentConverted={onDocumentConverted}
-      headerBadge={headerBadge}
-      secondaryHeader={secondaryHeader}
-      sidebar={sidebar}
-      documentType={document.document_type}
-      onPlanChange={document.document_type === 'sprint' || document.document_type === 'project' ? handlePlanChange : undefined}
-      contentBanner={combinedContentBanner}
-      onContentChange={isWeeklyDoc ? setEditorContent : undefined}
-      aiScoringAnalysis={isWeeklyDoc ? aiScoringAnalysis : undefined}
-      titleSuffix={titleSuffix}
-    />
+    <LazyErrorBoundary>
+      <Suspense fallback={<EditorSkeleton />}>
+        <Editor
+          documentId={document.id}
+          userName={user.name}
+          initialTitle={document.title}
+          onTitleChange={isTitleReadOnly ? undefined : handleTitleChange}
+          onTitleBlur={isTitleReadOnly ? undefined : handleTitleBlur}
+          titleReadOnly={isTitleReadOnly}
+          onBack={onBack}
+          backLabel={backLabel}
+          onDelete={onDelete}
+          roomPrefix={effectiveRoomPrefix}
+          placeholder={effectivePlaceholder}
+          onCreateSubDocument={onCreateSubDocument}
+          onNavigateToDocument={handleNavigateToDocument}
+          onDocumentConverted={onDocumentConverted}
+          headerBadge={headerBadge}
+          secondaryHeader={secondaryHeader}
+          sidebar={sidebar}
+          documentType={document.document_type}
+          onPlanChange={document.document_type === 'sprint' || document.document_type === 'project' ? handlePlanChange : undefined}
+          contentBanner={combinedContentBanner}
+          onContentChange={isWeeklyDoc ? setEditorContent : undefined}
+          aiScoringAnalysis={isWeeklyDoc ? aiScoringAnalysis : undefined}
+          titleSuffix={titleSuffix}
+        />
+      </Suspense>
+    </LazyErrorBoundary>
   );
 }
 

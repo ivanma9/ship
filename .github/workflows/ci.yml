@@ -53,3 +53,20 @@ jobs:
         run: pnpm test
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ship_test
+
+      - name: Build web (analyze)
+        run: pnpm --filter web run build:analyze
+        env:
+          VITE_API_URL: ''
+
+      - name: Check bundle budget
+        run: pnpm --filter web run bundle:check
+
+      - name: Upload bundle analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-analysis
+          path: |
+            web/dist/bundle-report.html
+            web/dist/bundle-size.json
+          if-no-files-found: error

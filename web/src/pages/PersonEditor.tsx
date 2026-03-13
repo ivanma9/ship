@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Editor } from '@/components/Editor';
+import { EditorSkeleton } from '@/components/ui/EditorSkeleton';
+import { LazyErrorBoundary } from '@/components/ui/LazyErrorBoundary';
+
+const Editor = lazy(() => import('@/components/Editor').then(m => ({ default: m.Editor })));
 import { useAuth } from '@/hooks/useAuth';
 import { useDocuments } from '@/contexts/DocumentsContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -226,57 +229,61 @@ export function PersonEditorPage() {
   }
 
   return (
-    <Editor
-      documentId={id}
-      userName={user?.name || 'Anonymous'}
-      initialTitle={person.title}
-      onTitleChange={handleTitleChange}
-      onTitleBlur={handleTitleBlur}
-      onBack={() => navigate('/team/directory')}
-      backLabel="Team Directory"
-      roomPrefix="person"
-      placeholder="Add bio, contact info, skills..."
-      onDelete={handleDelete}
-      onCreateSubDocument={handleCreateSubDocument}
-      onNavigateToDocument={handleNavigateToDocument}
-      contentBanner={titleSaveError ? (
-        <div
-          role="alert"
-          className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-300"
-        >
-          <div className="space-y-2">
-            <p>{titleSaveError}</p>
-            {titleConflict ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-amber-200/80">
-                  Server title: "{titleConflict.currentTitle}"
-                </span>
-                <button
-                  type="button"
-                  onClick={() => { void handleRetryTitleSave(); }}
-                  className="rounded border border-amber-300/40 px-2 py-1 text-xs font-medium text-amber-100 hover:bg-amber-500/10"
-                >
-                  Retry my title
-                </button>
+    <LazyErrorBoundary>
+      <Suspense fallback={<EditorSkeleton />}>
+        <Editor
+          documentId={id}
+          userName={user?.name || 'Anonymous'}
+          initialTitle={person.title}
+          onTitleChange={handleTitleChange}
+          onTitleBlur={handleTitleBlur}
+          onBack={() => navigate('/team/directory')}
+          backLabel="Team Directory"
+          roomPrefix="person"
+          placeholder="Add bio, contact info, skills..."
+          onDelete={handleDelete}
+          onCreateSubDocument={handleCreateSubDocument}
+          onNavigateToDocument={handleNavigateToDocument}
+          contentBanner={titleSaveError ? (
+            <div
+              role="alert"
+              className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-300"
+            >
+              <div className="space-y-2">
+                <p>{titleSaveError}</p>
+                {titleConflict ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-amber-200/80">
+                      Server title: "{titleConflict.currentTitle}"
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => { void handleRetryTitleSave(); }}
+                      className="rounded border border-amber-300/40 px-2 py-1 text-xs font-medium text-amber-100 hover:bg-amber-500/10"
+                    >
+                      Retry my title
+                    </button>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
-          </div>
-        </div>
-      ) : undefined}
-      sidebar={
-        <PersonSidebar
-          person={person}
-          people={teamMembers || []}
-          isAdmin={isWorkspaceAdmin}
-          onUpdateProperties={async (updates) => {
-            await apiPatch(`/api/documents/${id}`, { properties: updates });
-            setPerson(prev => prev ? { ...prev, properties: { ...prev.properties, ...updates } } : prev);
-          }}
-          metricsVisible={metricsVisible}
-          sprintMetrics={sprintMetrics}
+            </div>
+          ) : undefined}
+          sidebar={
+            <PersonSidebar
+              person={person}
+              people={teamMembers || []}
+              isAdmin={isWorkspaceAdmin}
+              onUpdateProperties={async (updates) => {
+                await apiPatch(`/api/documents/${id}`, { properties: updates });
+                setPerson(prev => prev ? { ...prev, properties: { ...prev.properties, ...updates } } : prev);
+              }}
+              metricsVisible={metricsVisible}
+              sprintMetrics={sprintMetrics}
+            />
+          }
         />
-      }
-    />
+      </Suspense>
+    </LazyErrorBoundary>
   );
 }
 
