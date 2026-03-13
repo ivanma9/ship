@@ -1,4 +1,5 @@
 import { Extension } from '@tiptap/core';
+import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
@@ -55,9 +56,9 @@ function escapeHtml(str: string): string {
 }
 
 /** Extract plain text from a ProseMirror node */
-function extractNodeText(node: any): string {
+function extractNodeText(node: ProseMirrorNode): string {
   let text = '';
-  node.descendants((child: any) => {
+  node.descendants((child: ProseMirrorNode) => {
     if (child.isText) text += child.text;
   });
   return text.trim();
@@ -72,10 +73,10 @@ function normalizeText(text: string): string {
  * Find list items in the document and return their positions and text.
  * Returns array of { pos: end position of list item block, text: extracted text }
  */
-function findListItems(doc: any): Array<{ endPos: number; text: string }> {
+function findListItems(doc: ProseMirrorNode): Array<{ endPos: number; text: string }> {
   const items: Array<{ endPos: number; text: string }> = [];
 
-  doc.descendants((node: any, pos: number) => {
+  doc.descendants((node: ProseMirrorNode, pos: number) => {
     if (node.type.name === 'listItem' || node.type.name === 'taskItem') {
       const text = extractNodeText(node);
       if (text) {
@@ -93,10 +94,10 @@ function findListItems(doc: any): Array<{ endPos: number; text: string }> {
  * Find planReference nodes in the document (for retro documents).
  * Returns array of { endPos, text } using the planItemText attribute.
  */
-function findPlanReferenceNodes(doc: any): Array<{ endPos: number; text: string }> {
+function findPlanReferenceNodes(doc: ProseMirrorNode): Array<{ endPos: number; text: string }> {
   const items: Array<{ endPos: number; text: string }> = [];
 
-  doc.descendants((node: any, pos: number) => {
+  doc.descendants((node: ProseMirrorNode, pos: number) => {
     if (node.type.name === 'planReference') {
       const text = node.attrs.planItemText || '';
       if (text) {
