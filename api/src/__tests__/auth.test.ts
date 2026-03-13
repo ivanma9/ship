@@ -10,6 +10,7 @@ vi.mock('../db/client.js', () => ({
 import { authMiddleware } from '../middleware/auth.js';
 import { pool } from '../db/client.js';
 import { Request, Response, NextFunction } from 'express';
+import { mockQueryResult, mockEmptyResult } from '../test-utils/mock-query-result.js';
 import { SESSION_TIMEOUT_MS, ABSOLUTE_SESSION_TIMEOUT_MS } from '@ship/shared';
 
 // Helper to create mock request/response
@@ -45,7 +46,7 @@ describe('authMiddleware', () => {
 
     it('returns 401 when session does not exist in database', async () => {
       const { req, res, next } = createMockReqRes({ session_id: 'invalid-session' });
-      vi.mocked(pool.query).mockResolvedValueOnce({ rows: [], rowCount: 0 } as any);
+      vi.mocked(pool.query).mockResolvedValueOnce(mockEmptyResult());
       await authMiddleware(req, res, next);
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalledWith(
@@ -60,18 +61,16 @@ describe('authMiddleware', () => {
       const { req, res, next } = createMockReqRes({ session_id: 'valid-session' });
       const now = new Date();
       vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'valid-session',
-            user_id: 'user-123',
-            workspace_id: 'ws-123',
-            last_activity: now,
-            created_at: now,
-            is_super_admin: false,
-          }],
-        } as any)
-        .mockResolvedValueOnce({ rows: [{ id: 'membership-1' }] } as any)
-        .mockResolvedValueOnce({ rows: [] } as any);
+        .mockResolvedValueOnce(mockQueryResult([{
+          id: 'valid-session',
+          user_id: 'user-123',
+          workspace_id: 'ws-123',
+          last_activity: now,
+          created_at: now,
+          is_super_admin: false,
+        }]))
+        .mockResolvedValueOnce(mockQueryResult([{ id: 'membership-1' }]))
+        .mockResolvedValueOnce(mockEmptyResult());
 
       await authMiddleware(req, res, next);
       expect(req.sessionId).toBe('valid-session');
@@ -86,16 +85,14 @@ describe('authMiddleware', () => {
       const { req, res, next } = createMockReqRes({ session_id: 'stale-session' });
       const now = new Date();
       const staleActivity = new Date(now.getTime() - SESSION_TIMEOUT_MS - 1000);
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [{
-          id: 'stale-session',
-          user_id: 'user-123',
-          workspace_id: 'ws-123',
-          last_activity: staleActivity,
-          created_at: now,
-          is_super_admin: false,
-        }],
-      } as any);
+      vi.mocked(pool.query).mockResolvedValueOnce(mockQueryResult([{
+        id: 'stale-session',
+        user_id: 'user-123',
+        workspace_id: 'ws-123',
+        last_activity: staleActivity,
+        created_at: now,
+        is_super_admin: false,
+      }]));
 
       await authMiddleware(req, res, next);
       expect(res.status).toHaveBeenCalledWith(401);
@@ -112,16 +109,14 @@ describe('authMiddleware', () => {
       const { req, res, next } = createMockReqRes({ session_id: 'old-session' });
       const now = new Date();
       const oldCreatedAt = new Date(now.getTime() - ABSOLUTE_SESSION_TIMEOUT_MS - 1000);
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [{
-          id: 'old-session',
-          user_id: 'user-123',
-          workspace_id: 'ws-123',
-          last_activity: now,
-          created_at: oldCreatedAt,
-          is_super_admin: false,
-        }],
-      } as any);
+      vi.mocked(pool.query).mockResolvedValueOnce(mockQueryResult([{
+        id: 'old-session',
+        user_id: 'user-123',
+        workspace_id: 'ws-123',
+        last_activity: now,
+        created_at: oldCreatedAt,
+        is_super_admin: false,
+      }]));
 
       await authMiddleware(req, res, next);
       expect(res.status).toHaveBeenCalledWith(401);
@@ -139,17 +134,15 @@ describe('authMiddleware', () => {
       const now = new Date();
       const staleActivity = new Date(now.getTime() - SESSION_TIMEOUT_MS - 1000);
       vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'expired-session',
-            user_id: 'user-123',
-            workspace_id: 'ws-123',
-            last_activity: staleActivity,
-            created_at: now,
-            is_super_admin: false,
-          }],
-        } as any)
-        .mockResolvedValueOnce({ rows: [] } as any);
+        .mockResolvedValueOnce(mockQueryResult([{
+          id: 'expired-session',
+          user_id: 'user-123',
+          workspace_id: 'ws-123',
+          last_activity: staleActivity,
+          created_at: now,
+          is_super_admin: false,
+        }]))
+        .mockResolvedValueOnce(mockEmptyResult());
 
       await authMiddleware(req, res, next);
       expect(pool.query).toHaveBeenCalledWith(
@@ -164,17 +157,15 @@ describe('authMiddleware', () => {
       const { req, res, next } = createMockReqRes({ session_id: 'valid-session' });
       const now = new Date();
       vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'valid-session',
-            user_id: 'user-123',
-            workspace_id: 'ws-123',
-            last_activity: now,
-            created_at: now,
-            is_super_admin: false,
-          }],
-        } as any)
-        .mockResolvedValueOnce({ rows: [] } as any);
+        .mockResolvedValueOnce(mockQueryResult([{
+          id: 'valid-session',
+          user_id: 'user-123',
+          workspace_id: 'ws-123',
+          last_activity: now,
+          created_at: now,
+          is_super_admin: false,
+        }]))
+        .mockResolvedValueOnce(mockEmptyResult());
 
       await authMiddleware(req, res, next);
       expect(res.status).toHaveBeenCalledWith(403);
@@ -191,17 +182,15 @@ describe('authMiddleware', () => {
       const { req, res, next } = createMockReqRes({ session_id: 'admin-session' });
       const now = new Date();
       vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'admin-session',
-            user_id: 'admin-123',
-            workspace_id: 'ws-123',
-            last_activity: now,
-            created_at: now,
-            is_super_admin: true,
-          }],
-        } as any)
-        .mockResolvedValueOnce({ rows: [] } as any);
+        .mockResolvedValueOnce(mockQueryResult([{
+          id: 'admin-session',
+          user_id: 'admin-123',
+          workspace_id: 'ws-123',
+          last_activity: now,
+          created_at: now,
+          is_super_admin: true,
+        }]))
+        .mockResolvedValueOnce(mockEmptyResult());
 
       await authMiddleware(req, res, next);
       expect(req.isSuperAdmin).toBe(true);
@@ -230,18 +219,16 @@ describe('authMiddleware', () => {
       // Last activity was 90 seconds ago (beyond 60s threshold)
       const lastActivity = new Date(now.getTime() - 90 * 1000);
       vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'valid-session',
-            user_id: 'user-123',
-            workspace_id: 'ws-123',
-            last_activity: lastActivity,
-            created_at: now,
-            is_super_admin: false,
-          }],
-        } as any)
-        .mockResolvedValueOnce({ rows: [{ id: 'membership-1' }] } as any)
-        .mockResolvedValueOnce({ rows: [] } as any);
+        .mockResolvedValueOnce(mockQueryResult([{
+          id: 'valid-session',
+          user_id: 'user-123',
+          workspace_id: 'ws-123',
+          last_activity: lastActivity,
+          created_at: now,
+          is_super_admin: false,
+        }]))
+        .mockResolvedValueOnce(mockQueryResult([{ id: 'membership-1' }]))
+        .mockResolvedValueOnce(mockEmptyResult());
 
       await authMiddleware(req, res, next);
       expect(res.cookie).toHaveBeenCalledWith('session_id', 'valid-session', {
@@ -260,18 +247,16 @@ describe('authMiddleware', () => {
       // Last activity was 30 seconds ago (within 60s threshold)
       const lastActivity = new Date(now.getTime() - 30 * 1000);
       vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'valid-session',
-            user_id: 'user-123',
-            workspace_id: 'ws-123',
-            last_activity: lastActivity,
-            created_at: now,
-            is_super_admin: false,
-          }],
-        } as any)
-        .mockResolvedValueOnce({ rows: [{ id: 'membership-1' }] } as any)
-        .mockResolvedValueOnce({ rows: [] } as any);
+        .mockResolvedValueOnce(mockQueryResult([{
+          id: 'valid-session',
+          user_id: 'user-123',
+          workspace_id: 'ws-123',
+          last_activity: lastActivity,
+          created_at: now,
+          is_super_admin: false,
+        }]))
+        .mockResolvedValueOnce(mockQueryResult([{ id: 'membership-1' }]))
+        .mockResolvedValueOnce(mockEmptyResult());
 
       await authMiddleware(req, res, next);
       expect(res.cookie).not.toHaveBeenCalled();
@@ -299,16 +284,14 @@ describe('authMiddleware', () => {
 
       // Mock token validation query
       vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'token-1',
-            user_id: 'user-123',
-            workspace_id: 'ws-123',
-            is_super_admin: false,
-          }],
-        } as any)
+        .mockResolvedValueOnce(mockQueryResult([{
+          id: 'token-1',
+          user_id: 'user-123',
+          workspace_id: 'ws-123',
+          is_super_admin: false,
+        }]))
         // Mock update last_used_at
-        .mockResolvedValueOnce({ rows: [] } as any);
+        .mockResolvedValueOnce(mockEmptyResult());
 
       await authMiddleware(req, res, next);
       expect(req.userId).toBe('user-123');
@@ -321,7 +304,7 @@ describe('authMiddleware', () => {
       const { req, res, next } = createMockReqResWithAuth('Bearer invalid_token');
 
       // Mock token not found
-      vi.mocked(pool.query).mockResolvedValueOnce({ rows: [] } as any);
+      vi.mocked(pool.query).mockResolvedValueOnce(mockEmptyResult());
 
       await authMiddleware(req, res, next);
       expect(res.status).toHaveBeenCalledWith(401);
@@ -337,7 +320,7 @@ describe('authMiddleware', () => {
       const { req, res, next } = createMockReqResWithAuth('Bearer ship_revokedtoken');
 
       // Mock token found but revoked (revoked_at is set)
-      vi.mocked(pool.query).mockResolvedValueOnce({ rows: [] } as any); // No results means revoked/expired
+      vi.mocked(pool.query).mockResolvedValueOnce(mockEmptyResult()); // No results means revoked/expired
 
       await authMiddleware(req, res, next);
       expect(res.status).toHaveBeenCalledWith(401);
@@ -358,15 +341,13 @@ describe('authMiddleware', () => {
       const next = vi.fn() as NextFunction;
 
       vi.mocked(pool.query)
-        .mockResolvedValueOnce({
-          rows: [{
-            id: 'token-1',
-            user_id: 'api-user',
-            workspace_id: 'api-ws',
-            is_super_admin: false,
-          }],
-        } as any)
-        .mockResolvedValueOnce({ rows: [] } as any);
+        .mockResolvedValueOnce(mockQueryResult([{
+          id: 'token-1',
+          user_id: 'api-user',
+          workspace_id: 'api-ws',
+          is_super_admin: false,
+        }]))
+        .mockResolvedValueOnce(mockEmptyResult());
 
       await authMiddleware(req, res, next);
       // Should use token auth, not session
