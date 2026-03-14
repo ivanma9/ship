@@ -50,33 +50,33 @@
 <div class="stats">
   <div class="stat">
     <div class="stat-label">API list-price equivalent</div>
-    <div class="stat-value">$42.87</div>
+    <div class="stat-value">$47.06</div>
     <div class="stat-sub">across 2 days (not billed)</div>
   </div>
   <div class="stat">
     <div class="stat-label">Sessions</div>
-    <div class="stat-value">11</div>
-    <div class="stat-sub">11 with token data</div>
+    <div class="stat-value">14</div>
+    <div class="stat-sub">14 with token data</div>
   </div>
   <div class="stat">
     <div class="stat-label">Output tokens</div>
-    <div class="stat-value">278,017</div>
+    <div class="stat-value">313,097</div>
     <div class="stat-sub">&nbsp;</div>
   </div>
   <div class="stat">
     <div class="stat-label">Cache read share</div>
-    <div class="stat-value">97.3%</div>
+    <div class="stat-value">97.2%</div>
     <div class="stat-sub">of all tokens</div>
   </div>
   <div class="stat">
     <div class="stat-label">Session time</div>
-    <div class="stat-value">3h 1m</div>
-    <div class="stat-sub">avg 16m 31s / session</div>
+    <div class="stat-value">3h 18m</div>
+    <div class="stat-sub">avg 14m 10s / session</div>
   </div>
   <div class="stat">
     <div class="stat-label">Key prompts captured</div>
     <div class="stat-value">0</div>
-    <div class="stat-sub">of 166 total prompts</div>
+    <div class="stat-sub">of 197 total prompts</div>
   </div>
   <div class="stat">
     <div class="stat-label">Prompt efficiency</div>
@@ -178,16 +178,16 @@
 
 <script>
 const DATES = ["2026-03-12", "2026-03-13"];
-const COST_BY_DATE = [9.3909, 33.4794];
-const SESSIONS_BY_DATE = [2, 9];
-const OUTPUT_BY_DATE = [76647, 201370];
+const COST_BY_DATE = [9.3909, 37.6676];
+const SESSIONS_BY_DATE = [2, 12];
+const OUTPUT_BY_DATE = [76647, 236450];
 const OPUS_BY_DATE = [0, 0];
-const SONNET_BY_DATE = [9.3909, 33.4794];
-const CUMUL_LABELS = ["2026-03-12 #1", "2026-03-12 #2", "2026-03-13 #3", "2026-03-13 #4", "2026-03-13 #5", "2026-03-13 #6", "2026-03-13 #7", "2026-03-13 #8", "2026-03-13 #9", "2026-03-13 #10", "2026-03-13 #11"];
-const CUMUL_VALUES = [3.3145, 9.3909, 9.9092, 16.1559, 16.8114, 17.038, 18.8644, 30.6817, 30.9309, 41.3173, 42.8703];
+const SONNET_BY_DATE = [9.3909, 37.6676];
+const CUMUL_LABELS = ["2026-03-12 #1", "2026-03-12 #2", "2026-03-13 #3", "2026-03-13 #4", "2026-03-13 #5", "2026-03-13 #6", "2026-03-13 #7", "2026-03-13 #8", "2026-03-13 #9", "2026-03-13 #10", "2026-03-13 #11", "2026-03-13 #12", "2026-03-13 #13", "2026-03-13 #14"];
+const CUMUL_VALUES = [3.3145, 9.3909, 9.9092, 10.5288, 16.7755, 17.431, 18.4824, 20.3088, 32.1261, 32.2654, 32.5146, 44.9444, 46.4974, 47.0585];
 const MODEL_LABELS = ["claude-sonnet-4-6"];
-const MODEL_COSTS = [42.8703];
-const MODEL_SESSIONS = [11];
+const MODEL_COSTS = [47.0585];
+const MODEL_SESSIONS = [14];
 const PROMPT_DATES = [];
 const PROMPT_TOTALS = [];
 const PROMPT_CAT_DATASETS = [];
@@ -195,17 +195,17 @@ const DONUT_LABELS = [];
 const DONUT_VALUES = [];
 const DONUT_COLORS = [];
 const ALL_PROMPT_DATES = ["2026-03-12", "2026-03-13"];
-const TOTAL_MSGS_BY_DATE = [30, 136];
-const TRIVIAL_BY_DATE = [9, 41];
+const TOTAL_MSGS_BY_DATE = [30, 167];
+const TRIVIAL_BY_DATE = [9, 50];
 const KEY_PROMPTS_BY_DATE = [0, 0];
 const EFFICIENCY_BY_DATE = [0.0, 0.0];
-const DURATION_BY_DATE = [1417, 9489];
-const CUMUL_DURATION = [700, 1417, 1502, 4580, 4702, 4728, 4964, 8474, 9512, 10716, 10906];
-const AVG_DURATION_BY_DATE = [708, 1054];
-const SCATTER_DATA = [{"x": 717, "y": 6.0764, "label": "2026-03-12 90b794"}, {"x": 700, "y": 3.3145, "label": "2026-03-12 5cd8cb"}, {"x": 236, "y": 1.8264, "label": "2026-03-13 65eb1c"}, {"x": 3078, "y": 6.2467, "label": "2026-03-13 13ed30"}, {"x": 122, "y": 0.6555, "label": "2026-03-13 455c72"}, {"x": 3510, "y": 11.8173, "label": "2026-03-13 683da9"}, {"x": 1204, "y": 10.3864, "label": "2026-03-13 bb07e1"}, {"x": 190, "y": 1.553, "label": "2026-03-13 cf0730"}, {"x": 85, "y": 0.5183, "label": "2026-03-13 05d498"}, {"x": 1038, "y": 0.2492, "label": "2026-03-13 9bb592"}, {"x": 26, "y": 0.2266, "label": "2026-03-13 53f6f0"}];
-const TPM_DATA = [{"x": 717, "y": 3244.5, "label": "2026-03-12 90b794"}, {"x": 700, "y": 3246.4, "label": "2026-03-12 5cd8cb"}, {"x": 236, "y": 2444.2, "label": "2026-03-13 65eb1c"}, {"x": 3078, "y": 767.6, "label": "2026-03-13 13ed30"}, {"x": 122, "y": 2630.2, "label": "2026-03-13 455c72"}, {"x": 3510, "y": 1057.1, "label": "2026-03-13 683da9"}, {"x": 1204, "y": 3301.0, "label": "2026-03-13 bb07e1"}, {"x": 190, "y": 3729.8, "label": "2026-03-13 cf0730"}, {"x": 85, "y": 2400.0, "label": "2026-03-13 05d498"}, {"x": 1038, "y": 150.6, "label": "2026-03-13 9bb592"}, {"x": 26, "y": 2614.6, "label": "2026-03-13 53f6f0"}];
+const DURATION_BY_DATE = [1417, 10491];
+const CUMUL_DURATION = [700, 1417, 1502, 1943, 5021, 5143, 5273, 5509, 9019, 9118, 10156, 11616, 11806, 11908];
+const AVG_DURATION_BY_DATE = [708, 874];
+const SCATTER_DATA = [{"x": 717, "y": 6.0764, "label": "2026-03-12 90b794"}, {"x": 700, "y": 3.3145, "label": "2026-03-12 5cd8cb"}, {"x": 236, "y": 1.8264, "label": "2026-03-13 65eb1c"}, {"x": 3078, "y": 6.2467, "label": "2026-03-13 13ed30"}, {"x": 122, "y": 0.6555, "label": "2026-03-13 455c72"}, {"x": 3510, "y": 11.8173, "label": "2026-03-13 683da9"}, {"x": 1460, "y": 12.4298, "label": "2026-03-13 bb07e1"}, {"x": 190, "y": 1.553, "label": "2026-03-13 cf0730"}, {"x": 85, "y": 0.5183, "label": "2026-03-13 05d498"}, {"x": 1038, "y": 0.2492, "label": "2026-03-13 9bb592"}, {"x": 130, "y": 1.0514, "label": "2026-03-13 53f6f0"}, {"x": 99, "y": 0.1393, "label": "2026-03-13 729c52"}, {"x": 102, "y": 0.5611, "label": "2026-03-13 dbf2a4"}, {"x": 441, "y": 0.6196, "label": "2026-03-13 0b44ee"}];
+const TPM_DATA = [{"x": 717, "y": 3244.5, "label": "2026-03-12 90b794"}, {"x": 700, "y": 3246.4, "label": "2026-03-12 5cd8cb"}, {"x": 236, "y": 2444.2, "label": "2026-03-13 65eb1c"}, {"x": 3078, "y": 767.6, "label": "2026-03-13 13ed30"}, {"x": 122, "y": 2630.2, "label": "2026-03-13 455c72"}, {"x": 3510, "y": 1057.1, "label": "2026-03-13 683da9"}, {"x": 1460, "y": 3341.1, "label": "2026-03-13 bb07e1"}, {"x": 190, "y": 3729.8, "label": "2026-03-13 cf0730"}, {"x": 85, "y": 2400.0, "label": "2026-03-13 05d498"}, {"x": 1038, "y": 150.6, "label": "2026-03-13 9bb592"}, {"x": 130, "y": 3448.6, "label": "2026-03-13 53f6f0"}, {"x": 99, "y": 449.1, "label": "2026-03-13 729c52"}, {"x": 102, "y": 4383.5, "label": "2026-03-13 dbf2a4"}, {"x": 441, "y": 746.8, "label": "2026-03-13 0b44ee"}];
 const DUR_HIST_LABELS = ["0\u20132m", "2\u20135m", "5\u201315m", "15\u201330m", "30m+"];
-const DUR_HIST_VALUES = [2, 3, 2, 2, 2];
+const DUR_HIST_VALUES = [3, 4, 3, 2, 2];
 
 function formatDuration(s) {
   if (s <= 0) return '0s';

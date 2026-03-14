@@ -214,30 +214,139 @@ Ship uses Playwright for end-to-end testing with 73+ tests covering all major fu
 
 ## Deployment
 
-Ship supports multiple deployment patterns:
+Ship can be deployed to **Railway + Vercel** (current production setup) or **AWS** (Elastic Beanstalk + S3/CloudFront).
 
+---
 
-| Environment     | Recommended Approach        |
-| --------------- | --------------------------- |
-| **Development** | Local with Docker Compose   |
-| **Staging**     | AWS Elastic Beanstalk       |
-| **Production**  | AWS GovCloud with Terraform |
+### Option A: Railway + Vercel (current production)
 
+#### Auto-deploy (recommended)
 
-### Docker
+Both platforms watch `master` and deploy automatically on every push — no manual steps needed.
+
+```bash
+git push origin master
+# Railway rebuilds and deploys the API automatically
+# Vercel rebuilds and deploys the frontend automatically
+```
+
+#### Manual deploy — API (Railway CLI)
+
+```bash
+# Install Railway CLI
+npm install -g @railway/cli
+
+# Authenticate
+railway login
+
+# Link to project (one-time setup)
+railway link
+
+# Deploy
+railway up --detach
+```
+
+#### Manual deploy — Frontend (Vercel CLI)
+
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Build shared package first, then web
+pnpm build:shared && pnpm --filter web build
+
+# Deploy pre-built output to production
+vercel deploy web/dist --prod --token $VERCEL_TOKEN
+```
+
+> **Note:** The Vercel GitHub App integration handles pnpm/corepack correctly. CLI deploys can hit corepack issues in some environments — see `docs/decisions/004-vercel-deployment-lessons.md` for details.
+
+#### Environment variables (Railway API service)
+
+| Variable         | Description                          |
+| ---------------- | ------------------------------------ |
+| `DATABASE_URL`   | PostgreSQL connection string         |
+| `SESSION_SECRET` | Random 64-char hex string            |
+| `CORS_ORIGIN`    | Vercel frontend URL                  |
+| `APP_BASE_URL`   | Vercel frontend URL                  |
+| `NODE_ENV`       | `production`                         |
+
+> Do **not** set `AWS_REGION` — its absence enables the non-AWS config path in `api/src/config/ssm.ts`.
+
+#### Environment variables (Vercel frontend)
+
+| Variable       | Description              |
+| -------------- | ------------------------ |
+| `VITE_API_URL` | Railway API service URL  |
+
+---
+
+### Option B: AWS (Elastic Beanstalk + S3/CloudFront)
+
+#### Prerequisites
+
+- AWS CLI configured with credentials that have EB, S3, CloudFront, and SSM permissions
+- Terraform installed
+- SSM parameters bootstrapped (see `terraform/README.md`)
+
+#### Deploy API (Elastic Beanstalk)
+
+```bash
+./scripts/deploy.sh prod
+```
+
+This script: builds the API, runs a Docker smoke test, zips a deployment bundle, uploads it to S3, and triggers a rolling EB update.
+
+#### Monitor API rollout
+
+```bash
+# Poll every 30s until Health=Green and Status=Ready
+aws elasticbeanstalk describe-environments \
+  --environment-names ship-api-prod \
+  --query 'Environments[0].[Health,HealthStatus,Status]'
+```
+
+#### Deploy Frontend (S3 + CloudFront)
+
+```bash
+# Build
+pnpm build:shared && pnpm --filter web build
+
+# Sync to S3
+S3_BUCKET=$(cd terraform && terraform output -raw s3_bucket_name)
+aws s3 sync web/dist/ s3://$S3_BUCKET/ --delete
+
+# Invalidate CloudFront cache
+DIST_ID=$(cd terraform && terraform output -raw cloudfront_distribution_id)
+aws cloudfront create-invalidation --distribution-id $DIST_ID --paths "/*"
+```
+
+#### Environment variables (EB)
+
+| Variable         | Description                      |
+| ---------------- | -------------------------------- |
+| `DATABASE_URL`   | PostgreSQL connection string     |
+| `SESSION_SECRET` | Cookie signing secret            |
+| `CORS_ORIGIN`    | CloudFront frontend URL          |
+| `APP_BASE_URL`   | CloudFront frontend URL          |
+| `NODE_ENV`       | `production`                     |
+| `AWS_REGION`     | e.g. `us-east-1`                 |
+
+---
+
+### Docker (local development)
 
 ```bash
 # Build production images (context is repo root)
 docker build -t ship-api .
 docker build -t ship-web -f web/Dockerfile .
 
-# Local development (full stack: Postgres + API + Web)
+# Full local stack: Postgres + API + Web
 pnpm docker:up
 # Or: docker compose -f docker-compose.local.yml up --build
 ```
 
-### Environment Variables
-
+### Local Environment Variables
 
 | Variable         | Description                  | Default  |
 | ---------------- | ---------------------------- | -------- |
