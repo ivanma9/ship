@@ -133,7 +133,7 @@ function getRetroStatus(cell: ReviewCell | undefined, weekIsPast: boolean): Revi
 interface WeeklyDoc {
   id: string;
   title: string;
-  content: unknown;
+  content: { type?: string; content?: TipTapNodeShape[] } | null | undefined;
   properties: Record<string, unknown>;
   person_name?: string;
   project_name?: string;
