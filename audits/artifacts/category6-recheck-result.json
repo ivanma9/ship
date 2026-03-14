@@ -1,0 +1,11 @@
+{
+  "capturedAt": "2026-03-14T22:28:02.096Z",
+  "totalConsoleErrors": 2,
+  "target": 5,
+  "pass": true,
+  "errorLines": [
+    "[2026-03-14T22:27:42.986Z] error: Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "[2026-03-14T22:27:43.292Z] error: Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "logFile": "audits/artifacts/console-recheck-1773527262391.log"
+}

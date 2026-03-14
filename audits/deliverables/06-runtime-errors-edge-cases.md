@@ -119,4 +119,18 @@ The pre-optimization baseline had 24 browser console errors per session (dominat
 |--------|--------|--------|
 | Unhandled promise rejections | 0 | MET — `Login.tsx` try/caught at code level |
 | Silent failures (no user feedback) | 0 | MET — all 8 empty catch blocks in `PlanQualityBanner.tsx` replaced with `console.error` |
-| Console error entries | ≤ 5 | PARTIALLY MET — static analysis suggests improvement; live re-capture pending |
+| Console error entries | ≤ 5 | **MET** — confirmed 2 errors in live browser re-capture (2026-03-14) |
+
+---
+
+## 2026-03-14 — Live Browser Re-capture (Confirmed)
+
+_Method: `node audits/artifacts/category6-console-recheck.mjs` — Playwright page traversal across all 8 main routes post-login (`/dashboard`, `/my-week`, `/docs`, `/issues`, `/projects`, `/programs`, `/team/allocation`, `/settings`). Same page set as the original 2026-03-10 baseline._
+
+| Metric | Before (2026-03-10) | After (2026-03-14) | Target | Status |
+|--------|--------------------:|-------------------:|--------|--------|
+| Console `error` entries per session | 24 | **2** | ≤ 5 | **PASS** |
+
+The 2 remaining errors are transient `401 Unauthorized` responses that fire immediately post-login before the session cookie is fully propagated — not persistent errors across page navigation.
+
+Result artifact: `audits/artifacts/category6-recheck-result.json`
