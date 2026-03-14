@@ -47,24 +47,17 @@ Type-safety violations were counted via an AST-based Node.js script scanning all
 | `web/src/hooks/useSessionTimeout.test.ts` | 159 | 0 | 2 | 0 | 0 | 0 | 157 |
 | `web/src/pages/ReviewsPage.tsx` | 150 | 0 | 6 | 4 | 0 | 57 | 83 |
 
-### After — Improvement Plan Targets
+### After — Re-measured 2026-03-14
 
-No remediation has been applied yet. The improvement plan targets a 25% reduction in core violations.
+_336 files scanned (16 new files added during sprint). Run: `node scripts/type-violation-scan.cjs`_
 
-| Metric | Before | Target | Reduction |
-|--------|-------:|-------:|----------:|
-| Core violations (`any` + `as` + `!` + `@ts-*`) | 1,283 | ≤ 962 | −321 (−25%) |
+| Metric | Before | After | Delta |
+|--------|-------:|------:|------:|
+| Core violations (`any` + `as` + `!` + `@ts-*`) | 1,283 | **1,143** | **−140 (−10.9%)** |
 
-### After — Planned Reduction by Phase
+CI ceiling gate added via `scripts/check-type-ceiling.mjs` — blocks any PR that pushes core violations above 1,143.
 
-| Phase | Scope | Target Reduction |
-|-------|-------|----------------:|
-| Phase 1 — API hotspot hardening | `api/src/routes/weeks.ts`, `api/src/routes/issues.ts` | −120 |
-| Phase 2 — Web core flow typing | `IssuesList.tsx`, `App.tsx`, `ReviewsPage.tsx` | −110 |
-| Phase 3 — Test and mock typing cleanup | `accountability.test.ts`, `transformIssueLinks.test.ts` | −70 |
-| Phase 4 — CI regression guardrails | Block increases in core violation count | −21+ and lock-in |
-
-**Note:** After-state measurements are not yet available. This section will be updated after Phase 1–4 implementation.
+Remaining gap to −25% target: −181 violations. Tracked in `docs/TODO.md` (Phases 1–4).
 
 ---
 
@@ -462,7 +455,7 @@ Roll-up table showing the single most important metric per category, before/afte
 
 | # | Category | Key Metric | Before | After | % Change |
 |---|----------|-----------|-------:|------:|---------:|
-| 1 | Type Safety | Core violations (`any` + `as` + `!` + `@ts-*`) | 1,283 | ≤ 962 (target) | −25% (target) |
+| 1 | Type Safety | Core violations (`any` + `as` + `!` + `@ts-*`) | 1,283 | 1,143 (CI gate locked) | −10.9% (−25% target in TODO) |
 | 2 | Bundle Size | Entry chunk gzip size | 587.59 KB | 259.97 KB | −55.8% |
 | 3 | API Response Time | `/api/documents?type=wiki` P95 at c50 | 123 ms | 8 ms | −93.5% |
 | 4 | Database Query Efficiency | Search content query execution time | 0.979 ms | 0.360 ms | −63.2% |

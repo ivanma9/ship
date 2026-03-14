@@ -1,16 +1,19 @@
 # 01 — Type Safety
 
 **Category:** Type Safety
-**Audit Date:** 2026-03-09
-**Source:** `audits/type-safety-audit-2026-03-09.md`
+**Before Date:** 2026-03-09
+**After Date:** 2026-03-14
+**Source:** `audits/type-safety-audit-2026-03-09.md`, `scripts/type-violation-scan.cjs`
 
-Type-safety violations were counted via an AST-based Node.js script scanning all `.ts` and `.tsx` source files in `api/`, `web/`, and `shared/` (320 files total, excluding `.d.ts`). Six categories were measured: `any` types, `as` assertions, non-null assertions (`!`), `@ts-ignore`/`@ts-expect-error` directives, untyped function parameters, and missing explicit return types.
+Type-safety violations were counted via an AST-based Node.js script (`scripts/type-violation-scan.cjs`) scanning all `.ts` and `.tsx` source files in `api/`, `web/`, and `shared/` (excluding `.d.ts`). Six categories were measured: `any` types, `as` assertions, non-null assertions (`!`), `@ts-ignore`/`@ts-expect-error` directives, untyped function parameters, and missing explicit return types.
+
+**Reproducibility:** Re-run with `node scripts/type-violation-scan.cjs` from repo root.
 
 ---
 
 ## Before — Core Violations by Package
 
-_Source: `audits/type-safety-audit-2026-03-09.md`, Section 3_
+_Source: `audits/type-safety-audit-2026-03-09.md`, Section 3 — 320 files scanned_
 
 | Package    | `any` | `as`  | `!`   | `@ts-ignore` / `@ts-expect-error` | Untyped Params | Missing Return Types | Total |
 |------------|------:|------:|------:|----------------------------------:|---------------:|---------------------:|------:|
@@ -19,43 +22,77 @@ _Source: `audits/type-safety-audit-2026-03-09.md`, Section 3_
 | `shared/`  | 0     | 2     | 0     | 0                                 | 0              | 0                    | 2     |
 | **Total**  | **262** | **691** | **329** | **1**                         | **1,451**      | **4,454**            | **7,188** |
 
-**Core metric total** (`any` + `as` + `!` + `@ts-*`): **1,283**
+**Core metric** (`any` + `as` + `!` + `@ts-*`): **1,283**
 
 ### Top 5 Violation-Dense Files (Before)
 
-| File | Total | `any` | `as` | `!` | `@ts-*` | Untyped Params | Missing Return Types |
-|------|------:|------:|-----:|----:|--------:|---------------:|---------------------:|
-| `web/src/components/IssuesList.tsx` | 189 | 0 | 4 | 0 | 0 | 47 | 138 |
-| `web/src/pages/App.tsx` | 180 | 0 | 1 | 0 | 0 | 30 | 149 |
-| `api/src/routes/weeks.ts` | 159 | 11 | 26 | 48 | 0 | 24 | 50 |
-| `web/src/hooks/useSessionTimeout.test.ts` | 159 | 0 | 2 | 0 | 0 | 0 | 157 |
-| `web/src/pages/ReviewsPage.tsx` | 150 | 0 | 6 | 4 | 0 | 57 | 83 |
+| File | Total | `any` | `as` | `!` | `@ts-*` |
+|------|------:|------:|-----:|----:|--------:|
+| `web/src/components/IssuesList.tsx` | 189 | 0 | 4 | 0 | 0 |
+| `web/src/pages/App.tsx` | 180 | 0 | 1 | 0 | 0 |
+| `api/src/routes/weeks.ts` | 159 | 11 | 26 | 48 | 0 |
+| `web/src/hooks/useSessionTimeout.test.ts` | 159 | 0 | 2 | 0 | 0 |
+| `web/src/pages/ReviewsPage.tsx` | 150 | 0 | 6 | 4 | 0 |
 
 ---
 
-## After — Improvement Plan Targets
+## After — Re-measured 2026-03-14
 
-_Source: `audits/type-safety-audit-2026-03-09.md`, Section 7_
+_Re-run via `node scripts/type-violation-scan.cjs` — 336 files scanned (16 new files added during sprint)_
 
-No remediation has been applied yet. The improvement plan targets a 25% reduction in core violations.
+| Package    | `any` | `as`  | `!`   | `@ts-ignore` / `@ts-expect-error` | Total Core |
+|------------|------:|------:|------:|----------------------------------:|-----------:|
+| `api/`     | 92    | 432   | 206   | 0                                 | 730        |
+| `web/`     | 13    | 356   | 43    | 1                                 | 413        |
+| `shared/`  | 0     | 0     | 0     | 0                                 | 0          |
+| **Total**  | **105** | **788** | **249** | **1**                          | **1,143**  |
 
-| Metric | Before | Target | Reduction |
-|--------|-------:|-------:|----------:|
-| Core violations (`any` + `as` + `!` + `@ts-*`) | 1,283 | ≤ 962 | −321 (−25%) |
+**Core metric** (`any` + `as` + `!` + `@ts-*`): **1,143** (was 1,283 — **−140, −10.9%**)
 
-### Planned Reduction by Phase
+### Top 10 Violation-Dense Files (After)
+
+| File | Total |
+|------|------:|
+| `api/src/routes/weeks.ts` | 110 |
+| `api/src/routes/issues.ts` | 89 |
+| `web/src/pages/ReviewsPage.tsx` | 76 |
+| `api/src/__tests__/transformIssueLinks.test.ts` | 74 |
+| `web/src/pages/App.tsx` | 65 |
+| `api/src/routes/projects.ts` | 59 |
+| `api/src/db/seed.ts` | 58 |
+| `web/src/components/IssuesList.tsx` | 58 |
+| `web/src/hooks/useWeeksQuery.ts` | 58 |
+| `web/src/pages/UnifiedDocumentPage.tsx` | 54 |
+
+### CI Gate Added
+
+`scripts/check-type-ceiling.mjs` — fails CI if core violations exceed 1,143. Ceiling is a ratchet: it can only be updated downward with justification.
+
+```bash
+node scripts/check-type-ceiling.mjs   # PASS: at ceiling
+```
+
+### Remaining Gap to 25% Target
+
+| Metric | Baseline | Current | Target (−25%) | Remaining |
+|--------|--------:|--------:|--------------:|----------:|
+| Core violations | 1,283 | 1,143 | ≤ 962 | −181 more needed |
+
+---
+
+## Planned Future Reduction (Option A — TODO)
+
+_See `docs/TODO.md` for the full phased plan._
 
 | Phase | Scope | Target Reduction |
 |-------|-------|----------------:|
 | Phase 1 — API hotspot hardening | `api/src/routes/weeks.ts`, `api/src/routes/issues.ts` | −120 |
 | Phase 2 — Web core flow typing | `IssuesList.tsx`, `App.tsx`, `ReviewsPage.tsx` | −110 |
-| Phase 3 — Test and mock typing cleanup | `accountability.test.ts`, `transformIssueLinks.test.ts` | −70 |
-| Phase 4 — CI regression guardrails | Block increases in core violation count | −21+ and lock-in |
-
-**Note:** After-state measurements are not yet available. This document will be updated after Phase 1–4 implementation.
+| Phase 3 — Test and mock typing cleanup | `transformIssueLinks.test.ts` | −70 |
+| Phase 4 — Lower CI ceiling | Update `CEILING` in `check-type-ceiling.mjs` after each phase | lock-in |
 
 ---
 
 ## Summary
 
-Strict mode is already enabled across the full repository and suppression directives are effectively absent (1 total). The primary debt is concentrated in `as` assertions (691) and non-null assertions in `api/src/routes/weeks.ts`. The `shared/` package has only 2 violations and serves as the quality baseline. The improvement plan targets a minimum −25% reduction (1,283 → ≤ 962 core violations) across four phases.
+Core violations dropped from 1,283 → 1,143 (−10.9%) through incidental improvements made during the sprint. A CI ceiling script now prevents regressions. The remaining 181 violations needed to hit the −25% target are tracked in `docs/TODO.md` as a phased follow-up.
