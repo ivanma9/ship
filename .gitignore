@@ -71,6 +71,7 @@ test-results/
 
 # Audit artifacts
 .audit
+audits/artifacts/accessibility/results/
 
 # Terraform
 terraform/.terraform/

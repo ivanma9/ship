@@ -73,3 +73,52 @@ jobs:
             web/dist/bundle-report.html
             web/dist/bundle-size.json
           if-no-files-found: error
+
+  accessibility-gates:
+    # Zero-tolerance: fails if any serious/critical axe violation exists on covered routes.
+    # Activate only after all fixes in 007-a11y-completion-gates are merged.
+    #
+    # No postgres service block needed: the isolated-env fixture (e2e/fixtures/isolated-env.ts)
+    # uses testcontainers to spin up its own per-worker PostgreSqlContainer, applies migrations
+    # directly via runMigrations(), and seeds test data — entirely independent of any YAML service.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build shared
+        run: pnpm build:shared
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build API
+        run: pnpm build:api
+
+      - name: Build web for preview
+        # VITE_API_URL is intentionally left blank here: the isolated-env fixture sets API_PORT
+        # at runtime so vite preview proxies to the per-worker API server on a dynamic port.
+        # A build-time VITE_API_URL would be overridden by the fixture's proxy anyway.
+        run: pnpm --filter @ship/web build
+
+      - name: Run accessibility gate tests
+        run: pnpm exec playwright test e2e/accessibility.spec.ts --reporter=list
+        env:
+          PLAYWRIGHT_WORKERS: 1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: a11y-gate-results
+          path: test-results/
+          retention-days: 30

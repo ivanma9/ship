@@ -702,7 +702,7 @@ export function TeamModePage() {
                         <div className="flex items-center gap-2 overflow-hidden">
                           <div className={cn(
                             "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-medium text-white",
-                            user.isArchived ? "bg-gray-400" : user.isPending ? "bg-gray-400" : "bg-accent/80"
+                            user.isArchived ? "bg-gray-500" : user.isPending ? "bg-gray-500" : "bg-accent/80"
                           )}>
                             {user.name.charAt(0).toUpperCase()}
                           </div>

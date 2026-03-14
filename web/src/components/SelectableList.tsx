@@ -71,12 +71,18 @@ export function SelectableList<T extends { id: string }>({
   ariaLabel = 'Selectable list',
 }: SelectableListProps<T>) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // Track focused column index for ArrowLeft/Right cell navigation (0-based)
+  const [focusedColIndex, setFocusedColIndex] = useState<number | null>(null);
 
   const selection = useSelection({
     items,
     getItemId,
     hoveredId,
     initialSelectedIds,
+    onEnter: onItemClick ? (id) => {
+      const item = items.find((i) => getItemId(i) === id);
+      if (item) onItemClick(item);
+    } : undefined,
   });
 
   // Notify parent of selection changes with both IDs and selection object
@@ -86,6 +92,11 @@ export function SelectableList<T extends { id: string }>({
   useEffect(() => {
     onSelectionChange?.(selection.selectedIds, selection);
   }, [selection.selectedIds, selection.focusedId, onSelectionChange]);
+
+  // Reset column focus when the focused row changes so ArrowLeft/Right starts fresh
+  useEffect(() => {
+    setFocusedColIndex(null);
+  }, [selection.focusedId]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, item: T) => {
     e.preventDefault();
@@ -112,6 +123,28 @@ export function SelectableList<T extends { id: string }>({
     );
   }
 
+  // Total column count: optional checkbox column + data columns
+  const totalColCount = (columns ? columns.length : 0) + (selectable ? 1 : 0);
+
+  const handleGridKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // ArrowRight/Left: move cell focus within a row
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      e.stopPropagation();
+      const maxCol = totalColCount - 1;
+      setFocusedColIndex(prev => {
+        const current = prev ?? (selectable ? 0 : 0);
+        if (e.key === 'ArrowRight') return Math.min(maxCol, current + 1);
+        return Math.max(0, current - 1);
+      });
+      return;
+    }
+    // Delegate row navigation and selection to useSelection handler
+    if (selectable) {
+      selection.handleKeyDown(e);
+    }
+  }, [selectable, selection, totalColCount]);
+
   return (
     <>
       <table
@@ -119,8 +152,10 @@ export function SelectableList<T extends { id: string }>({
         role="grid"
         aria-multiselectable={selectable ? 'true' : undefined}
         aria-label={ariaLabel}
+        aria-rowcount={items.length + 1}
+        aria-colcount={totalColCount > 0 ? totalColCount : undefined}
         tabIndex={0}
-        onKeyDown={selectable ? selection.handleKeyDown : undefined}
+        onKeyDown={handleGridKeyDown}
         onMouseLeave={() => {
           // Clear focusedId when mouse leaves the table entirely.
           // This ensures pressing 'j' after mouse exits starts from the first row.
@@ -130,10 +165,15 @@ export function SelectableList<T extends { id: string }>({
       >
         {columns && (
           <thead className="sticky top-0 bg-background z-10">
-            <tr className="border-b border-border text-left text-xs text-muted">
-              {selectable && <th className="w-10 px-2 py-2" aria-label="Selection"></th>}
-              {columns.map((col) => (
-                <th key={col.key} className={cn('px-4 py-2 font-medium', col.className)}>
+            <tr role="row" aria-rowindex={1} className="border-b border-border text-left text-xs text-muted">
+              {selectable && <th role="columnheader" aria-colindex={1} className="w-10 px-2 py-2" aria-label="Selection"></th>}
+              {columns.map((col, colIdx) => (
+                <th
+                  key={col.key}
+                  role="columnheader"
+                  aria-colindex={(selectable ? 1 : 0) + colIdx + 1}
+                  className={cn('px-4 py-2 font-medium', col.className)}
+                >
                   {col.label}
                 </th>
               ))}
@@ -151,10 +191,12 @@ export function SelectableList<T extends { id: string }>({
               <SelectableRow
                 key={itemId}
                 itemId={itemId}
+                rowIndex={index + 2}
                 isSelected={isSelected}
                 isFocused={isFocused}
                 isHovered={isHovered}
                 selectable={selectable}
+                focusedColIndex={isFocused ? focusedColIndex : null}
                 onCheckboxClick={(e) => {
                   // Checkbox clicks should toggle without clearing selection
                   // (unlike row clicks which replace selection on plain click)
@@ -165,6 +207,13 @@ export function SelectableList<T extends { id: string }>({
                   }
                 }}
                 onRowClick={() => onItemClick?.(item)}
+                onRowKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onItemClick?.(item);
+                  }
+                }}
                 onFocus={() => selection.setFocusedId(itemId)}
                 onMouseEnter={() => {
                   setHoveredId(itemId);
@@ -199,12 +248,16 @@ export function SelectableList<T extends { id: string }>({
 
 interface SelectableRowProps {
   itemId: string;
+  rowIndex: number;
   isSelected: boolean;
   isFocused: boolean;
   isHovered: boolean;
   selectable: boolean;
+  /** Which column (0-based) has cell-level focus when this row is focused */
+  focusedColIndex: number | null;
   onCheckboxClick: (e: React.MouseEvent) => void;
   onRowClick: () => void;
+  onRowKeyDown?: (e: React.KeyboardEvent<HTMLTableRowElement>) => void;
   onFocus: () => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -214,12 +267,15 @@ interface SelectableRowProps {
 
 function SelectableRow({
   itemId,
+  rowIndex,
   isSelected,
   isFocused,
   isHovered,
   selectable,
+  focusedColIndex,
   onCheckboxClick,
   onRowClick,
+  onRowKeyDown,
   onFocus,
   onMouseEnter,
   onMouseLeave,
@@ -229,9 +285,11 @@ function SelectableRow({
   return (
     <tr
       role="row"
+      aria-rowindex={rowIndex}
       aria-selected={isSelected}
       tabIndex={isFocused ? 0 : -1}
       onClick={onRowClick}
+      onKeyDown={onRowKeyDown}
       onFocus={onFocus}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -247,7 +305,12 @@ function SelectableRow({
     >
       {/* Checkbox cell */}
       {selectable && (
-        <td className="w-10 px-2 py-3" role="gridcell">
+        <td
+          role="gridcell"
+          aria-colindex={1}
+          data-cell-focused={isFocused && focusedColIndex === 0}
+          className="w-10 px-2 py-3"
+        >
           <div
             className={cn(
               'flex items-center justify-center transition-opacity',
@@ -280,7 +343,8 @@ function SelectableRow({
           </div>
         </td>
       )}
-      {/* Row content - rendered by parent */}
+      {/* Row content - rendered by parent; parent is responsible for setting
+          role="gridcell" and aria-colindex on each <td> it renders */}
       {children}
     </tr>
   );

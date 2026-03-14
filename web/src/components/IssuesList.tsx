@@ -250,7 +250,7 @@ export function IssuesList({
   const [showAllIssues, setShowAllIssues] = useState(false);
 
   // Self-fetch issues when using locked filters
-  const { data: fetchedIssues, isLoading: isFetchingIssues } = useIssuesQuery(
+  const { data: fetchedIssues, isLoading: isFetchingIssues, isError: isFetchError } = useIssuesQuery(
     shouldSelfFetch ? {
       programId: lockedProgramId,
       projectId: lockedProjectId,
@@ -931,14 +931,20 @@ export function IssuesList({
     forceUpdate(n => n + 1);
   }, []);
 
-  // Global keyboard navigation for j/k and Enter
+  // Hoisted unconditionally to satisfy rules-of-hooks; passed to useGlobalListNavigation
+  // only when not in list view (in list view, the ARIA grid's own Enter handler owns navigation).
+  const handleGlobalEnter = useCallback((focusedId: string) => {
+    navigate(`/documents/${focusedId}`);
+  }, [navigate]);
+
+  // Global keyboard navigation for j/k and Enter.
+  // When in list view, the ARIA grid's own Enter handler (via useSelection onEnter) owns
+  // navigation — suppress onEnter here to avoid a double-navigate race condition.
   useGlobalListNavigation({
     selection: selectionRef.current,
     selectionRef: selectionRef,
     enabled: enableKeyboardNavigation && viewMode === 'list',
-    onEnter: useCallback((focusedId: string) => {
-      navigate(`/documents/${focusedId}`);
-    }, [navigate]),
+    onEnter: viewMode === 'list' ? undefined : handleGlobalEnter,
   });
 
   // Kanban checkbox click handler
@@ -1054,7 +1060,7 @@ export function IssuesList({
 
   // Default empty state
   const defaultEmptyState = useMemo(() => (
-    <div className="text-center">
+    <div role="status" aria-live="polite" className="text-center">
       <p className="text-muted">No issues found</p>
       {canCreateIssue && (
         <button
@@ -1069,6 +1075,16 @@ export function IssuesList({
 
   if (loading) {
     return <IssuesListSkeleton />;
+  }
+
+  if (isFetchError) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div role="status" aria-live="polite" className="text-center">
+          <p className="text-muted">Something went wrong loading issues.</p>
+        </div>
+      </div>
+    );
   }
 
   // Program filter for toolbar (hidden when locked)
@@ -1351,15 +1367,39 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
   // Apply reduced opacity to out-of-context issues
   const cellClass = isOutOfContext ? 'opacity-50' : '';
 
+  // Compute aria-colindex for each cell (1-based; col 1 is the checkbox cell).
+  // We count how many columns before each key are visible to get the DOM position.
+  const COLUMN_ORDER = ['id', 'title', 'status', 'source', 'program', 'sprint', 'priority', 'assignee', 'updated'] as const;
+  const colIndexMap: Partial<Record<typeof COLUMN_ORDER[number], number>> = {};
+  let colCounter = 2; // col 1 is checkbox (selectable); data cols start at 2
+  for (const key of COLUMN_ORDER) {
+    if (visibleColumns.has(key)) {
+      colIndexMap[key] = colCounter++;
+    }
+  }
+
+  // Map column keys to their human-readable labels for screen reader announcements
+  const COL_LABELS: Record<typeof COLUMN_ORDER[number], string> = {
+    id: 'ID',
+    title: 'Title',
+    status: 'Status',
+    source: 'Source',
+    program: 'Program',
+    sprint: 'Week',
+    priority: 'Priority',
+    assignee: 'Assignee',
+    updated: 'Updated',
+  };
+
   return (
     <>
       {visibleColumns.has('id') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['id']} aria-label={`${COL_LABELS.id}: #${issue.ticket_number}`}>
           #{issue.ticket_number}
         </td>
       )}
       {visibleColumns.has('title') && (
-        <td className={cn("px-4 py-3 text-sm text-foreground", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-foreground", cellClass)} role="gridcell" aria-colindex={colIndexMap['title']} aria-label={`${COL_LABELS.title}: ${issue.title}`}>
           <div className="flex items-center gap-2">
             <span className="truncate">{issue.title}</span>
             {isOutOfContext && onAddToContext && (
@@ -1381,22 +1421,22 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
         </td>
       )}
       {visibleColumns.has('status') && (
-        <td className={cn("px-4 py-3", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['status']} aria-label={`${COL_LABELS.status}: ${STATE_LABELS[issue.state] || issue.state}`}>
           <StatusBadge state={issue.state} />
         </td>
       )}
       {visibleColumns.has('source') && (
-        <td className={cn("px-4 py-3", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['source']} aria-label={`${COL_LABELS.source}: ${issue.source || '—'}`}>
           <SourceBadge source={issue.source} />
         </td>
       )}
       {visibleColumns.has('program') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['program']} aria-label={`${COL_LABELS.program}: ${getProgramTitle(issue) || '—'}`}>
           {getProgramTitle(issue) || '—'}
         </td>
       )}
       {visibleColumns.has('sprint') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['sprint']} aria-label={`${COL_LABELS.sprint}: ${getSprintTitle(issue) || '—'}`}>
           {sprints && onSprintChange ? (
             <InlineWeekSelector
               value={getSprintId(issue)}
@@ -1409,12 +1449,12 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
         </td>
       )}
       {visibleColumns.has('priority') && (
-        <td className={cn("px-4 py-3", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3", cellClass)} role="gridcell" aria-colindex={colIndexMap['priority']} aria-label={`${COL_LABELS.priority}: ${PRIORITY_LABELS[issue.priority] || issue.priority || '—'}`}>
           <PriorityBadge priority={issue.priority} />
         </td>
       )}
       {visibleColumns.has('assignee') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass, issue.assignee_archived && "opacity-50")} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass, issue.assignee_archived && "opacity-50")} role="gridcell" aria-colindex={colIndexMap['assignee']} aria-label={`${COL_LABELS.assignee}: ${issue.assignee_name ? `${issue.assignee_name}${issue.assignee_archived ? ' (archived)' : ''}` : 'Unassigned'}`}>
           {issue.assignee_name ? (
             <>
               {issue.assignee_name}{issue.assignee_archived && ' (archived)'}
@@ -1423,7 +1463,7 @@ function IssueRowContent({ issue, visibleColumns, sprints, onSprintChange, isOut
         </td>
       )}
       {visibleColumns.has('updated') && (
-        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell">
+        <td className={cn("px-4 py-3 text-sm text-muted", cellClass)} role="gridcell" aria-colindex={colIndexMap['updated']} aria-label={`${COL_LABELS.updated}: ${issue.updated_at ? formatDate(issue.updated_at) : '—'}`}>
           {issue.updated_at ? formatDate(issue.updated_at) : '-'}
         </td>
       )}

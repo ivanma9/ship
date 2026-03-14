@@ -31,8 +31,11 @@ test.describe('Accessibility - axe-core audit', () => {
     expect(criticalViolations).toHaveLength(0)
   })
 
-  test('main app shell has no critical accessibility violations', async ({ page }) => {
+  test('dashboard (/my-week) has no critical accessibility violations', async ({ page }) => {
     await login(page)
+    // Explicitly navigate to the dashboard route (the app routes /dashboard mode to /my-week;
+    // /my-week is the canonical URL — required by FR-005)
+    await page.goto('/my-week')
     await page.waitForLoadState('networkidle')
 
     const results = await new AxeBuilder({ page })
@@ -86,6 +89,46 @@ test.describe('Accessibility - axe-core audit', () => {
     } else {
       await page.goto('/programs')
     }
+    await page.waitForLoadState('networkidle')
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze()
+
+    const criticalViolations = results.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious'
+    )
+
+    if (criticalViolations.length > 0) {
+      console.log('Critical violations:', JSON.stringify(criticalViolations, null, 2))
+    }
+
+    expect(criticalViolations).toHaveLength(0)
+  })
+
+  test('projects page has no critical accessibility violations', async ({ page }) => {
+    await login(page)
+    await page.goto('/projects')
+    await page.waitForLoadState('networkidle')
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze()
+
+    const criticalViolations = results.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious'
+    )
+
+    if (criticalViolations.length > 0) {
+      console.log('Critical violations:', JSON.stringify(criticalViolations, null, 2))
+    }
+
+    expect(criticalViolations).toHaveLength(0)
+  })
+
+  test('team allocation page has no critical accessibility violations', async ({ page }) => {
+    await login(page)
+    await page.goto('/team/allocation')
     await page.waitForLoadState('networkidle')
 
     const results = await new AxeBuilder({ page })
@@ -250,6 +293,81 @@ test.describe('Accessibility - Screen Reader Announcements', () => {
     const hasPasswordLabel = passwordLabelledBy || (await passwordLabel.count()) > 0
 
     expect(hasPasswordLabel).toBeTruthy()
+  })
+})
+
+test.describe('Accessibility - ARIA Grid Keyboard Traversal', () => {
+  test('issues table supports full keyboard traversal', async ({ page }) => {
+    // Login first
+    await login(page)
+
+    // Navigate to /issues
+    await page.goto('/issues')
+    await page.waitForLoadState('networkidle')
+
+    // Wait for the grid to render with at least one data row
+    const grid = page.locator('[role="grid"]').first()
+    await expect(grid).toBeVisible({ timeout: 5000 })
+    const firstRow = page.locator('[role="row"]').nth(1) // nth(0) is header, nth(1) is first data row
+    await expect(firstRow).toBeVisible({ timeout: 5000 })
+
+    // Verify ARIA grid contract attributes
+    await expect(grid).toHaveAttribute('aria-label')
+    await expect(grid).toHaveAttribute('aria-rowcount')
+    await expect(grid).toHaveAttribute('aria-colcount')
+
+    // Verify header row has aria-rowindex="1"
+    const headerRow = page.locator('[role="row"][aria-rowindex="1"]')
+    await expect(headerRow).toBeVisible()
+
+    // Verify header cells have role="columnheader"
+    const columnHeaders = page.locator('[role="columnheader"]')
+    const headerCount = await columnHeaders.count()
+    expect(headerCount).toBeGreaterThan(0)
+
+    // Verify data rows have aria-rowindex starting at 2
+    const secondRow = page.locator('[role="row"][aria-rowindex="2"]')
+    await expect(secondRow).toBeVisible()
+
+    // Verify data cells have role="gridcell" and aria-colindex
+    const firstDataCell = secondRow.locator('[role="gridcell"]').first()
+    await expect(firstDataCell).toBeVisible()
+    await expect(firstDataCell).toHaveAttribute('aria-colindex')
+
+    // Require at least 3 data rows so we can verify ArrowDown moves between two distinct rows.
+    // Seed data must provide at least 3 issues. Run: pnpm db:seed
+    const dataRowCount = await page.locator('[role="row"][aria-rowindex]').count()
+    // aria-rowindex includes the header (rowindex=1) plus data rows (rowindex>=2)
+    expect(dataRowCount, 'Seed data should provide at least 3 data rows (aria-rowindex 2, 3, 4+). Run: pnpm db:seed').toBeGreaterThanOrEqual(3)
+
+    // Tab into the grid — focus the grid container
+    await grid.focus()
+    await expect(grid).toBeFocused()
+
+    // Press ArrowDown once: focus moves to first data row (aria-rowindex="2")
+    await page.keyboard.press('ArrowDown')
+    const firstFocusedRow = page.locator('[role="row"][data-focused="true"]')
+    await expect(firstFocusedRow).toBeVisible()
+    await expect(firstFocusedRow).toHaveAttribute('aria-rowindex', '2')
+
+    // Press ArrowDown again: focus must move to second data row (aria-rowindex="3")
+    await page.keyboard.press('ArrowDown')
+    const secondFocusedRow = page.locator('[role="row"][data-focused="true"]')
+    await expect(secondFocusedRow).toBeVisible()
+    await expect(secondFocusedRow).toHaveAttribute('aria-rowindex', '3')
+
+    // Press ArrowUp: focus must return to first data row (aria-rowindex="2")
+    await page.keyboard.press('ArrowUp')
+    const rowAfterUp = page.locator('[role="row"][data-focused="true"]')
+    await expect(rowAfterUp).toHaveAttribute('aria-rowindex', '2')
+
+    // Press Enter to activate the focused row — must invoke primary action (navigate to document)
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/\/documents\//, { timeout: 3000 })
+
+    // Navigate back to /issues to clean up
+    await page.goto('/issues')
+    await page.waitForLoadState('networkidle')
   })
 })
 

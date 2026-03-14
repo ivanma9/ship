@@ -8,6 +8,8 @@ export interface UseSelectionOptions<T> {
   hoveredId?: string | null;
   /** Initial selected IDs - for restoring selection after navigation */
   initialSelectedIds?: Set<string>;
+  /** Primary action invoked when Enter is pressed on a focused item (e.g. navigate to document) */
+  onEnter?: (id: string) => void;
 }
 
 export interface UseSelectionReturn {
@@ -44,6 +46,7 @@ export function useSelection<T>({
   onSelectionChange,
   hoveredId,
   initialSelectedIds,
+  onEnter,
 }: UseSelectionOptions<T>): UseSelectionReturn {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => initialSelectedIds || new Set());
   const [focusedId, setFocusedId] = useState<string | null>(null);
@@ -299,6 +302,14 @@ export function useSelection<T>({
         break;
 
       case 'Enter':
+        e.preventDefault();
+        e.stopPropagation(); // Prevent global listener from also handling
+        if (focusedId) {
+          // Enter invokes the primary action (e.g. navigate to the document)
+          onEnter?.(focusedId);
+        }
+        break;
+
       case ' ':
         e.preventDefault();
         e.stopPropagation(); // Prevent global listener from also handling
@@ -331,6 +342,7 @@ export function useSelection<T>({
     toggleInGroup,
     selectAll,
     clearSelection,
+    onEnter,
   ]);
 
   return {
