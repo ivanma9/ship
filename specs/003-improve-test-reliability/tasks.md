@@ -29,7 +29,7 @@
 
 **⚠️ CRITICAL**: No user story is complete until this phase is done.
 
-- [ ] T004 Stabilize shared web test cleanup, mock reset, and environment defaults in `web/src/test/setup.ts`
+- [x] T004 Stabilize shared web test cleanup, mock reset, and environment defaults in `web/src/test/setup.ts`
 - [X] T005 [P] Add reusable high-risk wait helpers and convergence utilities in `e2e/fixtures/test-helpers.ts`
 - [X] T006 [P] Extend deterministic collaboration, offline, and RBAC seed data in `e2e/fixtures/isolated-env.ts`
 - [X] T007 Define targeted E2E progress/baseline summary fields for flaky tracking in `e2e/progress-reporter.ts`
@@ -47,26 +47,26 @@
 ### Tests for User Story 1
 
 - [X] T008 [P] [US1] Reproduce and document the failing behavior groups for the web unit suite in `audits/consolidated-audit-report-2026-03-10.md`
-- [ ] T009 [P] [US1] Add regression-safe setup coverage for shared cleanup behavior in `web/src/test/setup.ts`
+- [x] T009 [P] [US1] Add regression-safe setup coverage for shared cleanup behavior in `web/src/test/setup.ts`
 
 ### Implementation for User Story 1
 
 - [X] T010 [P] [US1] Repair deterministic editor-extension assertions in `web/src/components/editor/DetailsExtension.test.ts`
-- [ ] T011 [P] [US1] Repair deterministic drag-handle behavior coverage in `web/src/components/editor/DragHandle.test.ts`
-- [ ] T012 [P] [US1] Repair deterministic attachment and upload tests in `web/src/components/editor/FileAttachment.test.ts`
-- [ ] T013 [P] [US1] Repair deterministic image upload timing and cleanup in `web/src/components/editor/ImageUpload.test.ts`
-- [ ] T014 [P] [US1] Repair deterministic mention and table-of-contents tests in `web/src/components/editor/MentionExtension.test.ts`
-- [ ] T015 [P] [US1] Repair deterministic TOC rendering assertions in `web/src/components/editor/TableOfContents.test.ts`
-- [ ] T016 [P] [US1] Repair deterministic context and hook tests in `web/src/contexts/SelectionPersistenceContext.test.tsx`
-- [ ] T017 [P] [US1] Repair deterministic autosave and selection hook tests in `web/src/hooks/useAutoSave.test.ts`
-- [ ] T018 [P] [US1] Repair deterministic selection hook state transitions in `web/src/hooks/useSelection.test.ts`
+- [x] T011 [P] [US1] Repair deterministic drag-handle behavior coverage in `web/src/components/editor/DragHandle.test.ts`
+- [x] T012 [P] [US1] Repair deterministic attachment and upload tests in `web/src/components/editor/FileAttachment.test.ts`
+- [x] T013 [P] [US1] Repair deterministic image upload timing and cleanup in `web/src/components/editor/ImageUpload.test.ts`
+- [x] T014 [P] [US1] Repair deterministic mention and table-of-contents tests in `web/src/components/editor/MentionExtension.test.ts`
+- [x] T015 [P] [US1] Repair deterministic TOC rendering assertions in `web/src/components/editor/TableOfContents.test.ts`
+- [x] T016 [P] [US1] Repair deterministic context and hook tests in `web/src/contexts/SelectionPersistenceContext.test.tsx`
+- [x] T017 [P] [US1] Repair deterministic autosave and selection hook tests in `web/src/hooks/useAutoSave.test.ts`
+- [x] T018 [P] [US1] Repair deterministic selection hook state transitions in `web/src/hooks/useSelection.test.ts`
 - [X] T019 [P] [US1] Repair deterministic session-timeout behavior tests in `web/src/hooks/useSessionTimeout.test.ts`
-- [ ] T020 [P] [US1] Repair deterministic lib and page tests in `web/src/lib/accountability.test.ts`
-- [ ] T021 [P] [US1] Repair deterministic API and document-tab tests in `web/src/lib/api.test.ts`
+- [x] T020 [P] [US1] Repair deterministic lib and page tests in `web/src/lib/accountability.test.ts`
+- [x] T021 [P] [US1] Repair deterministic API and document-tab tests in `web/src/lib/api.test.ts`
 - [X] T022 [P] [US1] Repair deterministic document-tab coverage in `web/src/lib/document-tabs.test.ts`
-- [ ] T023 [P] [US1] Repair deterministic HTTP error and dashboard tests in `web/src/lib/http-error.test.ts`
-- [ ] T024 [P] [US1] Repair deterministic dashboard rendering coverage in `web/src/pages/Dashboard.test.tsx`
-- [ ] T025 [P] [US1] Repair deterministic style-level drag-handle coverage in `web/src/styles/drag-handle.test.ts`
+- [x] T023 [P] [US1] Repair deterministic HTTP error and dashboard tests in `web/src/lib/http-error.test.ts`
+- [x] T024 [P] [US1] Repair deterministic dashboard rendering coverage in `web/src/pages/Dashboard.test.tsx`
+- [x] T025 [P] [US1] Repair deterministic style-level drag-handle coverage in `web/src/styles/drag-handle.test.ts`
 - [X] T026 [US1] Publish grouped root causes and fix notes for the 13 deterministic failures in `audits/consolidated-audit-report-2026-03-10.md`
 
 **Checkpoint**: User Story 1 is complete when the web coverage command passes twice without manual retries and the root-cause notes are published.
@@ -81,8 +81,8 @@
 
 ### Tests for User Story 2
 
-- [ ] T027 [P] [US2] Add helper-level regression coverage for new wait and convergence utilities in `e2e/fixtures/test-helpers.ts`
-- [ ] T028 [P] [US2] Add deterministic fixture assertions for seeded collaborators, roles, and documents in `e2e/fixtures/isolated-env.ts`
+- [x] T027 [P] [US2] Add helper-level regression coverage for new wait and convergence utilities in `e2e/fixtures/test-helpers.ts`
+- [x] T028 [P] [US2] Add deterministic fixture assertions for seeded collaborators, roles, and documents in `e2e/fixtures/isolated-env.ts`
 
 ### Implementation for User Story 2
 
@@ -109,14 +109,14 @@
 
 ### Tests for User Story 3
 
-- [ ] T039 [P] [US3] Validate that targeted E2E summary output exposes pass, fail, pending, and flaky-friendly counters in `scripts/watch-tests.sh`
-- [ ] T040 [P] [US3] Validate the baseline publication sections and delta fields in `audits/consolidated-audit-report-2026-03-10.md`
+- [x] T039 [P] [US3] Validate that targeted E2E summary output exposes pass, fail, pending, and flaky-friendly counters in `scripts/watch-tests.sh`
+- [x] T040 [P] [US3] Validate the baseline publication sections and delta fields in `audits/consolidated-audit-report-2026-03-10.md`
 
 ### Implementation for User Story 3
 
 - [X] T041 [US3] Update targeted E2E watch and summary handling for baseline publication in `scripts/watch-tests.sh`
-- [ ] T042 [P] [US3] Adjust targeted E2E retry and reporting settings for the scoped gate in `playwright.config.ts`
-- [ ] T043 [P] [US3] Update pre-commit quality gate notes for the repaired command set in `.husky/pre-commit`
+- [x] T042 [P] [US3] Adjust targeted E2E retry and reporting settings for the scoped gate in `playwright.config.ts`
+- [x] T043 [P] [US3] Update pre-commit quality gate notes for the repaired command set in `.husky/pre-commit`
 - [X] T044 [US3] Publish the refreshed pass/fail/flaky and coverage deltas in `audits/consolidated-audit-report-2026-03-10.md`
 
 **Checkpoint**: User Story 3 is complete when the updated audit artifact publishes current baseline values and deltas for the repaired test surfaces.

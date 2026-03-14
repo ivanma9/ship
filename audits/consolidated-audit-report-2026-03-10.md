@@ -563,7 +563,7 @@ Rerun stability notes:
 | E2E suite size                     | `pnpm exec playwright test --list`                                         | Counted listed tests and spec files                                         | Inventory only; not execution quality                  |
 | Critical-flow traceability         | filename mapping + spot checks                                             | Mapped specs to CRUD, Sync, Auth, Sprint flows and looked for dark logic    | Filename intent can over/under represent behavior      |
 | Flakiness risk indicators          | `rg -n "waitForTimeout\(" e2e/*.spec.ts`                                   | Flagged fixed-wait usage in high-risk flows                                 | Static indicator only                                  |
-| Coverage instrumentation readiness | config inspection + `vitest --coverage` execution                          | Verified provider setup and collected API/Web line+branch baselines         | Web baseline currently includes 13 known failing tests |
+| Coverage instrumentation readiness | config inspection + `vitest --coverage` execution                          | Verified provider setup and collected API/Web line+branch baselines         | Web baseline previously included 13 known failing tests; all resolved as of 2026-03-14 (28 files, 198 tests passing) |
 
 ### 3. Findings (Ranked)
 
