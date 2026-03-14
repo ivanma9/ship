@@ -360,7 +360,7 @@ function IssueCard({
         <div className={cn("mt-2 flex items-center gap-1", issue.assignee_archived && "opacity-50")}>
           <div className={cn(
             "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium text-white",
-            issue.assignee_archived ? "bg-gray-400" : "bg-accent/50"
+            issue.assignee_archived ? "bg-gray-500" : "bg-accent/50"
           )}>
             {issue.assignee_name.charAt(0).toUpperCase()}
           </div>

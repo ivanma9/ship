@@ -10,8 +10,9 @@ export default {
         foreground: '#f5f5f5',
         muted: '#8a8a8a', // Changed from #737373 (4.09:1) to #8a8a8a (5.1:1 contrast)
         border: '#262626',
-        accent: '#005ea2', // Logo blue — use on light bg or with white text (6.72:1 on white); focus ring uses #1a85d9 instead
-        'accent-hover': '#0071bc', // Lighter blue for hover — use on light bg or with white text
+        accent: '#005ea2', // Logo blue — use as bg with white text (6.72:1 on white); NOT as text on dark bg
+        'accent-hover': '#0071bc', // Lighter blue for hover — use as bg with white text
+        'accent-text': '#1a85d9', // Accessible blue for text on dark bg (5.0:1 on #0d0d0d, WCAG AA)
       },
       fontFamily: {
         sans: [

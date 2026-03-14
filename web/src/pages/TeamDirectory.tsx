@@ -157,7 +157,7 @@ export function TeamDirectoryPage() {
                     <div className="flex items-center gap-3">
                       <div className={cn(
                         'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-medium text-white',
-                        person.isArchived ? 'bg-gray-400' : 'bg-accent/80'
+                        person.isArchived ? 'bg-gray-500' : 'bg-accent/80'
                       )}>
                         {person.name.charAt(0).toUpperCase()}
                       </div>

@@ -449,7 +449,7 @@ function StatusIndicator({
       : approvalState === 'changed_since_approved'
       ? 'bg-yellow-500'
       : 'bg-blue-500'
-    : 'bg-gray-400';
+    : 'bg-gray-500'; /* gray-400 had white text at 2.54:1 — gray-500 passes 3:1 */
 
   return (
     <div

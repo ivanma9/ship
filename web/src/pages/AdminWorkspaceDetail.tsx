@@ -316,7 +316,7 @@ export function AdminWorkspaceDetailPage() {
                         {invite.x509SubjectDn ? (
                           <span className="font-mono text-xs">{invite.x509SubjectDn}</span>
                         ) : (
-                          <span className="text-muted/50">-</span>
+                          <span className="text-muted">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm text-muted capitalize">{invite.role}</td>
