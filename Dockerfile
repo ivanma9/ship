@@ -38,5 +38,6 @@ ENV VITE_APP_ENV=production
 ENV PORT=80
 
 # Start the application (run migrations first to ensure schema exists)
+# Set SEED_DB=true in Railway env vars to seed on next deploy (one-time use)
 WORKDIR /app/api
-CMD ["sh", "-c", "node dist/db/migrate.js && node dist/index.js"]
+CMD ["sh", "-c", "node dist/db/migrate.js && ([ \"$SEED_DB\" = \"true\" ] && node dist/db/seed.js || true) && node dist/index.js"]
