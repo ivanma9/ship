@@ -17,8 +17,8 @@
 
 **Purpose**: Refresh the local performance baseline and pin the validation surfaces used throughout the feature.
 
-- [ ] T001 Capture a fresh pre-change query-efficiency baseline with `pnpm exec tsx audits/artifacts/db-query-efficiency-audit.ts` and store the output in `audits/artifacts/db-query-efficiency-baseline.json`
-- [ ] T002 Capture pre-change `EXPLAIN ANALYZE` notes for mention search and accountability hotspot queries in `audits/consolidated-audit-report-2026-03-10.md`
+- [X] T001 Capture a fresh pre-change query-efficiency baseline with `pnpm exec tsx audits/artifacts/db-query-efficiency-audit.ts` and store the output in `audits/artifacts/db-query-efficiency-baseline.json`
+- [X] T002 Capture pre-change `EXPLAIN ANALYZE` notes for mention search and accountability hotspot queries in `audits/consolidated-audit-report-2026-03-10.md`
 - [X] T003 Verify the implementation and validation command sequence in `specs/004-optimize-query-flows/quickstart.md`
 
 ---
@@ -53,7 +53,7 @@
 - [X] T009 [US1] Replace the dual-query mention-search implementation with one CTE plus `UNION ALL` statement that preserves independent source filtering, ordering, and limits in `api/src/routes/search.ts`
 - [X] T010 [US1] Reconstruct merged mention-search rows back into the existing `people` and `documents` contract in `api/src/routes/search.ts`
 - [X] T011 [US1] Capture post-change mention-search `EXPLAIN ANALYZE` findings and record the index decision in `audits/consolidated-audit-report-2026-03-10.md`
-- [ ] T012 [US1] Add targeted title-search support only if repeated seeded runs or `EXPLAIN ANALYZE` show the merged search query misses the latency target or uses unstable plans in `api/src/db/migrations/038_query_efficiency_indexes.sql`
+- [X] T012 [US1] Add targeted title-search support only if repeated seeded runs or `EXPLAIN ANALYZE` show the merged search query misses the latency target or uses unstable plans in `api/src/db/migrations/038_query_efficiency_indexes.sql` — SKIPPED: latency 0.229 ms < 5 ms target, plan stable; no migration needed
 
 **Checkpoint**: User Story 1 is complete when mention search remains contract-stable and the audited search-content flow drops to four queries
 
