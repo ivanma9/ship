@@ -1,4 +1,4 @@
-import { Request } from 'express';
+import { Request, RequestHandler, Response, NextFunction } from 'express';
 
 /**
  * Request type for route handlers behind authMiddleware.
@@ -8,4 +8,16 @@ import { Request } from 'express';
 export interface AuthenticatedRequest extends Request {
   workspaceId: string;
   userId: string;
+}
+
+/**
+ * Cast an AuthenticatedRequest handler to a plain RequestHandler.
+ * Required because Express's RequestHandler uses the global Request type
+ * (workspaceId?: string) while AuthenticatedRequest narrows it to string.
+ * The auth middleware guarantees workspaceId is set before the handler runs.
+ */
+export function authHandler(
+  handler: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void> | void
+): RequestHandler {
+  return handler as unknown as RequestHandler;
 }

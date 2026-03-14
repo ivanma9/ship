@@ -12,7 +12,7 @@ import {
   type BelongsToEntry,
 } from '../utils/document-crud.js';
 import { broadcastToUser } from '../collaboration/index.js';
-import { AuthenticatedRequest } from '../types/express.js';
+import { AuthenticatedRequest, authHandler } from '../types/express.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
@@ -140,7 +140,7 @@ function extractIssueFromRow(row: IssueRow) {
 }
 
 // List issues with filters
-router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { state, priority, assignee_id, program_id, sprint_id, source, parent_filter } = req.query;
     const userId = req.userId;
@@ -267,10 +267,10 @@ router.get('/', authMiddleware, async (req: AuthenticatedRequest, res: Response)
     console.error('List issues error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Get action items for current user (issues with source='action_items' that are not done)
-router.get('/action-items', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/action-items', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     // In test mode, return empty to avoid blocking E2E test interactions with modal
     if (process.env.NODE_ENV === 'test') {
@@ -358,10 +358,10 @@ router.get('/action-items', authMiddleware, async (req: AuthenticatedRequest, re
     console.error('Get action items error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Get issue by ticket number
-router.get('/by-ticket/:number', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/by-ticket/:number', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const numberParam = req.params.number;
     if (!numberParam || typeof numberParam !== 'string') {
@@ -436,12 +436,12 @@ router.get('/by-ticket/:number', authMiddleware, async (req: AuthenticatedReques
     console.error('Get issue by ticket error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Get sub-issues (children) of an issue
-router.get('/:id/children', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/:id/children', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params as { id: string };
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -514,12 +514,12 @@ router.get('/:id/children', authMiddleware, async (req: AuthenticatedRequest, re
     console.error('Get issue children error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Get single issue
-router.get('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params as { id: string };
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -583,11 +583,11 @@ router.get('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Respon
     console.error('Get issue error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Create issue
 // Uses advisory lock to prevent race condition in ticket number generation
-router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   const client = await pool.connect();
   try {
     const parsed = createIssueSchema.safeParse(req.body);
@@ -696,10 +696,10 @@ router.post('/', authMiddleware, async (req: AuthenticatedRequest, res: Response
   } finally {
     client.release();
   }
-});
+}));
 
 // Update issue
-router.patch('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.patch('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   const client = await pool.connect();
   try {
     const id = String(req.params.id);
@@ -1032,12 +1032,12 @@ router.patch('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Resp
   } finally {
     client.release();
   }
-});
+}));
 
 // Get issue history
-router.get('/:id/history', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/:id/history', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params as { id: string };
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1083,7 +1083,7 @@ router.get('/:id/history', authMiddleware, async (req: AuthenticatedRequest, res
     console.error('Get issue history error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Log custom history entry (for verification failures, etc.)
 const logHistorySchema = z.object({
@@ -1093,7 +1093,7 @@ const logHistorySchema = z.object({
   automated_by: z.string().optional(),
 });
 
-router.post('/:id/history', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/:id/history', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const id = String(req.params.id);
     if (!id) {
@@ -1139,7 +1139,7 @@ router.post('/:id/history', authMiddleware, async (req: AuthenticatedRequest, re
     console.error('Log history entry error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Bulk update issues
 const bulkUpdateSchema = z.object({
@@ -1153,7 +1153,7 @@ const bulkUpdateSchema = z.object({
   }).optional(),
 });
 
-router.post('/bulk', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/bulk', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   const client = await pool.connect();
   try {
     const parsed = bulkUpdateSchema.safeParse(req.body);
@@ -1352,13 +1352,13 @@ router.post('/bulk', authMiddleware, async (req: AuthenticatedRequest, res: Resp
   } finally {
     client.release();
   }
-});
+}));
 
 // Delete issue
 // System-generated accountability issues cannot be deleted
-router.delete('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.delete('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params as { id: string };
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1400,10 +1400,10 @@ router.delete('/:id', authMiddleware, async (req: AuthenticatedRequest, res: Res
     console.error('Delete issue error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Accept issue (move from triage to backlog)
-router.post('/:id/accept', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/:id/accept', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const id = String(req.params.id);
     const userId = req.userId;
@@ -1452,7 +1452,7 @@ router.post('/:id/accept', authMiddleware, async (req: AuthenticatedRequest, res
     console.error('Accept issue error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // ============== ITERATION ENDPOINTS ==============
 // Iterations track Claude's work progress on individual issues
@@ -1469,7 +1469,7 @@ const listIterationsSchema = z.object({
 });
 
 // Create iteration entry - POST /api/issues/:id/iterations
-router.post('/:id/iterations', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/:id/iterations', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id: issueId } = req.params;
     const userId = req.userId;
@@ -1534,10 +1534,10 @@ router.post('/:id/iterations', authMiddleware, async (req: AuthenticatedRequest,
     console.error('Create iteration error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Get issue iterations - GET /api/issues/:id/iterations
-router.get('/:id/iterations', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.get('/:id/iterations', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id: issueId } = req.params;
     const userId = req.userId;
@@ -1604,10 +1604,10 @@ router.get('/:id/iterations', authMiddleware, async (req: AuthenticatedRequest, 
     console.error('Get iterations error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Reject issue (move from triage to cancelled with reason)
-router.post('/:id/reject', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+router.post('/:id/reject', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const id = String(req.params.id);
     const userId = req.userId;
@@ -1664,6 +1664,6 @@ router.post('/:id/reject', authMiddleware, async (req: AuthenticatedRequest, res
     console.error('Reject issue error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 export default router;
