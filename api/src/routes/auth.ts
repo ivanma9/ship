@@ -5,6 +5,7 @@ import crypto from 'crypto';
 import { pool } from '../db/client.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { ERROR_CODES, HTTP_STATUS, SESSION_TIMEOUT_MS, ABSOLUTE_SESSION_TIMEOUT_MS } from '@ship/shared';
+import { sessionCookieOptions } from '../lib/cookie-options.js';
 import { logAuditEvent } from '../services/audit.js';
 
 const router: RouterType = Router();
@@ -183,11 +184,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 
     // Set cookie with hardened security options
     res.cookie('session_id', sessionId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict', // Strict for government applications
+      ...sessionCookieOptions(),
       maxAge: SESSION_TIMEOUT_MS,
-      path: '/',
     });
 
     res.json({
@@ -238,12 +236,7 @@ router.post('/logout', authMiddleware, async (req: Request, res: Response): Prom
     await pool.query('DELETE FROM sessions WHERE id = $1', [req.sessionId]);
 
     // Clear cookie with same options used when setting it
-    res.clearCookie('session_id', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-    });
+    res.clearCookie('session_id', sessionCookieOptions());
 
     res.json({ success: true });
   } catch (error) {
@@ -362,11 +355,8 @@ router.post('/extend-session', authMiddleware, async (req: Request, res: Respons
 
     // Refresh cookie with new maxAge (sliding expiration)
     res.cookie('session_id', req.sessionId, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      ...sessionCookieOptions(),
       maxAge: SESSION_TIMEOUT_MS,
-      path: '/',
     });
 
     res.json({

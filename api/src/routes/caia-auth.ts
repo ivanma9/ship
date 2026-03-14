@@ -25,6 +25,7 @@ import {
   consumeOAuthState,
 } from '../services/oauth-state.js';
 import { SESSION_TIMEOUT_MS } from '@ship/shared';
+import { sessionCookieOptions } from '../lib/cookie-options.js';
 import { logAuditEvent } from '../services/audit.js';
 
 const router: RouterType = Router();
@@ -302,11 +303,8 @@ router.get('/callback', async (req: Request, res: Response): Promise<void> => {
 
     // Set session cookie (always secure - OAuth flow requires HTTPS anyway)
     res.cookie('session_id', sessionId, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'strict',
+      ...sessionCookieOptions(),
       maxAge: SESSION_TIMEOUT_MS,
-      path: '/',
     });
 
     // Get returnTo from query param (preserved through OAuth flow)

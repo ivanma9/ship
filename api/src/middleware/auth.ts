@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { pool } from '../db/client.js';
 import { SESSION_TIMEOUT_MS, ABSOLUTE_SESSION_TIMEOUT_MS, ERROR_CODES, HTTP_STATUS } from '@ship/shared';
+import { sessionCookieOptions } from '../lib/cookie-options.js';
 
 // Extend Express Request to include session info
 declare global {
@@ -212,11 +213,8 @@ export async function authMiddleware(
     const COOKIE_REFRESH_THRESHOLD_MS = 60 * 1000;
     if (inactivityMs > COOKIE_REFRESH_THRESHOLD_MS) {
       res.cookie('session_id', sessionId, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        ...sessionCookieOptions(),
         maxAge: SESSION_TIMEOUT_MS,
-        path: '/',
       });
     }
 

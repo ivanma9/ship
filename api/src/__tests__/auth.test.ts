@@ -231,9 +231,10 @@ describe('authMiddleware', () => {
         .mockResolvedValueOnce(mockEmptyResult());
 
       await authMiddleware(req, res, next);
+      // NODE_ENV is 'test' (not 'production'), so sameSite='strict', secure=false
       expect(res.cookie).toHaveBeenCalledWith('session_id', 'valid-session', {
         httpOnly: true,
-        secure: false, // NODE_ENV is 'test', not 'production'
+        secure: false,
         sameSite: 'strict',
         maxAge: SESSION_TIMEOUT_MS,
         path: '/',
