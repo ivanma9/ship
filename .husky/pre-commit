@@ -1,3 +1,6 @@
+# Type check — catches tsc errors before CI
+pnpm type-check
+
 # Fail on empty Playwright tests (they silently pass - major footgun)
 if [ -f "./scripts/check-empty-tests.sh" ]; then
   ./scripts/check-empty-tests.sh
