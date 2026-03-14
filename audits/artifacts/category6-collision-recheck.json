@@ -1,0 +1,12 @@
+{
+  "capturedAt": "2026-03-14T23:13:42.950Z",
+  "attemptedA": "UserA-1773530016838",
+  "attemptedB": "UserB-1773530016838",
+  "clientAFinal": "UserB-1773530016838",
+  "clientBFinal": "UserB-1773530016838",
+  "serverFinal": "UserB-1773530016838",
+  "clientsConverged": true,
+  "serverMatchesAClient": true,
+  "serverMatchesBClient": true,
+  "inference": "Converged (Last-Write-Wins resolved)"
+}

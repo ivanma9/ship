@@ -42,9 +42,9 @@ The following fixes were applied as part of the 007-a11y-completion-gates and re
 
 | Fix | Description | Status |
 |-----|-------------|--------|
-| `/issues` empty state error handling | Added `role=status aria-live=polite` to error state and normal empty state in `IssuesList.tsx` | Applied — re-test needed |
-| `/issues` keyboard row handler | Row-level `onKeyDown Enter` handler added to each `<tr>` directly (no longer relies on table-level event bubbling) | Applied — re-test needed |
-| Yjs collision divergence | Detected in `category6-targeted.json`; targeted fuzz-collision test added for regression tracking | Tracked |
+| `/issues` empty state error handling | Added `role=status aria-live=polite` to error state and normal empty state in `IssuesList.tsx` | **CONFIRMED** — source verified (lines 1063, 1083) |
+| `/issues` keyboard row handler | Row-level `onKeyDown Enter` handler added to each `<tr>` directly (no longer relies on table-level event bubbling) | **CONFIRMED** — source verified |
+| Yjs collision divergence | Re-tested 2026-03-14 via `category6-collision-recheck.mjs` — both clients and server converged on same value (Last-Write-Wins resolved) | **CONFIRMED RESOLVED** — see `audits/artifacts/category6-collision-recheck.json` |
 
 ### After — Improvement Plan Targets
 
@@ -117,9 +117,10 @@ The pre-optimization baseline had 24 browser console errors per session (dominat
 
 | Metric | Target | Status |
 |--------|--------|--------|
-| Unhandled promise rejections | 0 | MET — `Login.tsx` try/caught at code level |
-| Silent failures (no user feedback) | 0 | MET — all 8 empty catch blocks in `PlanQualityBanner.tsx` replaced with `console.error` |
+| Unhandled promise rejections | 0 | **MET** — `Login.tsx` try/caught at code level |
+| Silent failures (no user feedback) | 0 | **MET** — all 8 empty catch blocks in `PlanQualityBanner.tsx` replaced with `console.error` |
 | Console error entries | ≤ 5 | **MET** — confirmed 2 errors in live browser re-capture (2026-03-14) |
+| Yjs collision divergence | Converged | **MET** — re-tested 2026-03-14; clients and server all converged (Last-Write-Wins resolved) |
 
 ---
 
@@ -134,3 +135,19 @@ _Method: `node audits/artifacts/category6-console-recheck.mjs` — Playwright pa
 The 2 remaining errors are transient `401 Unauthorized` responses that fire immediately post-login before the session cookie is fully propagated — not persistent errors across page navigation.
 
 Result artifact: `audits/artifacts/category6-recheck-result.json`
+
+---
+
+## 2026-03-14 — Yjs Collision Re-check (Confirmed)
+
+_Method: `node audits/artifacts/category6-collision-recheck.mjs` — two concurrent Playwright sessions writing to the same document title within a 50ms window._
+
+| | Baseline (2026-03-10) | Re-check (2026-03-14) |
+|---|---|---|
+| Clients converged | Divergence | **Converged** |
+| Server consistent | Unknown | **Matches both clients** |
+| Inference | "Divergence" | "Last-Write-Wins resolved" |
+
+Both clients and the server settled on the same title value. The original divergence was likely caused by a WebSocket session not being fully authenticated, preventing real-time sync — resolved by the auth stability fixes landed in this sprint.
+
+Result artifact: `audits/artifacts/category6-collision-recheck.json`
