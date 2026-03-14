@@ -159,7 +159,7 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
       maxAge: 15 * 60 * 1000, // 15 minutes
     },
   }));
