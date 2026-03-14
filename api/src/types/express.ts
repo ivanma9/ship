@@ -19,5 +19,5 @@ export interface AuthenticatedRequest extends Request {
 export function authHandler(
   handler: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void> | void
 ): RequestHandler {
-  return handler as unknown as RequestHandler;
+  return (req, res, next) => handler(req as AuthenticatedRequest, res, next);
 }

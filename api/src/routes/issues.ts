@@ -441,7 +441,7 @@ router.get('/by-ticket/:number', authMiddleware, authHandler(async (req: Authent
 // Get sub-issues (children) of an issue
 router.get('/:id/children', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -519,7 +519,7 @@ router.get('/:id/children', authMiddleware, authHandler(async (req: Authenticate
 // Get single issue
 router.get('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1037,7 +1037,7 @@ router.patch('/:id', authMiddleware, authHandler(async (req: AuthenticatedReques
 // Get issue history
 router.get('/:id/history', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1358,7 +1358,7 @@ router.post('/bulk', authMiddleware, authHandler(async (req: AuthenticatedReques
 // System-generated accountability issues cannot be deleted
 router.delete('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 

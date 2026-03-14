@@ -761,7 +761,7 @@ router.get('/my-week', authMiddleware, authHandler(async (req: AuthenticatedRequ
 // Automatically takes a plan snapshot when sprint becomes active (start_date reached)
 router.get('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1039,7 +1039,7 @@ router.post('/', authMiddleware, authHandler(async (req: AuthenticatedRequest, r
 // When sprint_number changes, the plan snapshot is cleared and will be retaken when the new date arrives
 router.patch('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1221,7 +1221,7 @@ router.patch('/:id', authMiddleware, authHandler(async (req: AuthenticatedReques
 // POST /api/weeks/:id/start
 router.post('/:id/start', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1327,7 +1327,7 @@ router.post('/:id/start', authMiddleware, authHandler(async (req: AuthenticatedR
 // Delete sprint
 router.delete('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1369,7 +1369,7 @@ router.delete('/:id', authMiddleware, authHandler(async (req: AuthenticatedReque
 // PATCH /api/weeks/:id/plan
 router.patch('/:id/plan', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1530,7 +1530,7 @@ router.patch('/:id/plan', authMiddleware, authHandler(async (req: AuthenticatedR
 // Get sprint issues
 router.get('/:id/issues', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1629,7 +1629,7 @@ router.get('/:id/issues', authMiddleware, authHandler(async (req: AuthenticatedR
 // Returns: { originalScope, currentScope, scopeChangePercent, scopeChanges }
 router.get('/:id/scope-changes', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1859,7 +1859,7 @@ function formatStandupResponse(row: StandupRow) {
  */
 router.get('/:id/standups', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -1952,7 +1952,7 @@ router.get('/:id/standups', authMiddleware, authHandler(async (req: Authenticate
  */
 router.post('/:id/standups', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -2207,7 +2207,7 @@ async function generatePrefilledReviewContent(sprintData: SprintDataForReview, i
 // GET /api/weeks/:id/review - Get or generate pre-filled sprint review
 router.get('/:id/review', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -2292,7 +2292,7 @@ router.get('/:id/review', authMiddleware, authHandler(async (req: AuthenticatedR
       .filter((t: string) => t.trim().length > 0);
 
     const sprintData = {
-      sprint_number: (sprintProps.sprint_number as number) || 1,
+      sprint_number: (typeof sprintProps.sprint_number === 'number' ? sprintProps.sprint_number : 1),
       program_name: sprint.program_name,
       plan: planTexts.length > 0 ? planTexts.join('\n\n') : null,
     };
@@ -2321,7 +2321,7 @@ router.get('/:id/review', authMiddleware, authHandler(async (req: AuthenticatedR
 // POST /api/weeks/:id/review - Create finalized sprint review
 router.post('/:id/review', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -2434,7 +2434,7 @@ router.post('/:id/review', authMiddleware, authHandler(async (req: Authenticated
 // PATCH /api/weeks/:id/review - Update existing sprint review
 router.patch('/:id/review', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -2734,7 +2734,7 @@ router.post('/:id/carryover', authMiddleware, authHandler(async (req: Authentica
 // POST /api/weeks/:id/approve-plan - Approve sprint plan
 router.post('/:id/approve-plan', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
     const parsedComment = parseApprovalComment(req.body);
@@ -2834,7 +2834,7 @@ router.post('/:id/approve-plan', authMiddleware, authHandler(async (req: Authent
 // POST /api/weeks/:id/unapprove-plan - Revoke plan approval (logged to history)
 router.post('/:id/unapprove-plan', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const userId = req.userId;
     const workspaceId = req.workspaceId;
 
@@ -2893,7 +2893,7 @@ router.post('/:id/unapprove-plan', authMiddleware, authHandler(async (req: Authe
 // POST /api/weeks/:id/approve-review - Approve sprint review (rating required)
 router.post('/:id/approve-review', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const { rating } = req.body || {};
     const userId = req.userId;
     const workspaceId = req.workspaceId;
@@ -3022,7 +3022,7 @@ router.post('/:id/approve-review', authMiddleware, authHandler(async (req: Authe
 // POST /api/weeks/:id/request-plan-changes - Request changes on sprint plan
 router.post('/:id/request-plan-changes', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const { feedback } = req.body || {};
     const userId = req.userId;
     const workspaceId = req.workspaceId;
@@ -3115,7 +3115,7 @@ router.post('/:id/request-plan-changes', authMiddleware, authHandler(async (req:
 // POST /api/weeks/:id/request-retro-changes - Request changes on sprint retro
 router.post('/:id/request-retro-changes', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params as { id: string };
+    const id = String(req.params['id'] ?? '');
     const { feedback } = req.body || {};
     const userId = req.userId;
     const workspaceId = req.workspaceId;
