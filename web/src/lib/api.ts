@@ -391,10 +391,15 @@ async function request<T>(
   // Only for SESSION_EXPIRED (actual expiration), not UNAUTHORIZED (no session existed)
   // Skip for public routes like /invite where 401 is expected for unauthenticated users
   if (response.status === 401) {
-    if (data.error?.code === 'SESSION_EXPIRED' || turbulenceEligible) {
-      if (!window.location.pathname.startsWith('/invite')) {
-        handleSessionExpired(); // never returns - shows "session expired" message
-      }
+    const isSessionExpired = data.error?.code === 'SESSION_EXPIRED';
+    // Don't treat UNAUTHORIZED as session expiry even in turbulence window —
+    // a fresh login followed by an API call that legitimately returns UNAUTHORIZED
+    // must not show "session timed out" to the user.
+    const isUnauthorized = data.error?.code === 'UNAUTHORIZED';
+
+    if ((isSessionExpired || (turbulenceEligible && !isUnauthorized)) &&
+        !window.location.pathname.startsWith('/invite')) {
+      handleSessionExpired(); // never returns - shows "session expired" message
     }
     // UNAUTHORIZED (no session) just returns error - ProtectedRoute will redirect without expired message
     return data;

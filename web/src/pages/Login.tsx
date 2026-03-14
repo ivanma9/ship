@@ -29,6 +29,7 @@ export function LoginPage() {
   const [password, setPassword] = useState(shouldPrefill ? 'admin123' : '');
   const [error, setError] = useState('');
   const [errorField, setErrorField] = useState<'email' | 'password' | 'general' | null>(null);
+  const [isRateLimited, setIsRateLimited] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingSetup, setIsCheckingSetup] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -143,6 +144,7 @@ export function LoginPage() {
     e.preventDefault();
     setError('');
     setErrorField(null);
+    setIsRateLimited(false);
 
     // Manual validation for accessibility (shows role="alert" error messages)
     if (!email.trim()) {
@@ -157,15 +159,17 @@ export function LoginPage() {
     }
 
     setIsLoading(true);
+    setIsRateLimited(false);
 
     const result = await login(email, password);
 
     if (result.success) {
       navigate(from, { replace: true });
     } else {
-      const isRateLimited = result.code === 'RATE_LIMITED';
-      setError(result.error || (isRateLimited ? 'Too many login attempts. Please wait and try again.' : 'Login failed'));
-      setErrorField(isRateLimited ? 'general' : 'email');
+      const rateLimited = result.code === 'RATE_LIMITED';
+      setIsRateLimited(rateLimited);
+      setError(result.error || (rateLimited ? 'Too many login attempts. Please wait and try again.' : 'Login failed'));
+      setErrorField(rateLimited ? 'general' : 'email');
       setIsLoading(false);
     }
   }
@@ -230,7 +234,12 @@ export function LoginPage() {
             <div
               id="login-error"
               role="alert"
-              className="rounded-md border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
+              className={cn(
+                'rounded-md px-4 py-3 text-sm',
+                isRateLimited
+                  ? 'border border-yellow-500/20 bg-yellow-500/10 text-yellow-400'
+                  : 'border border-red-500/20 bg-red-500/10 text-red-400'
+              )}
             >
               {error}
             </div>
