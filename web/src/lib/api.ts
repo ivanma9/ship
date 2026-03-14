@@ -97,6 +97,19 @@ async function recoverAuthFailureResponse(
   return currentResponse;
 }
 
+/**
+ * Read the error code from a 401/403 response without consuming the body.
+ * Uses Response.clone() so the caller can still read the original response.
+ */
+async function getResponseErrorCode(res: Response): Promise<string | null> {
+  try {
+    const body = await res.clone().json();
+    return (body?.error?.code as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function clearPendingSessionRedirect(): void {
   if (pendingSessionRedirect) {
     clearTimeout(pendingSessionRedirect);
@@ -261,7 +274,11 @@ async function fetchWithCsrf(
   res = await recoverAuthFailureResponse(endpoint, () => executeRequest(token), res);
 
   if (res.status === 401) {
-    handleSessionExpired(); // never returns
+    const code = await getResponseErrorCode(res);
+    if (code !== 'UNAUTHORIZED') {
+      handleSessionExpired(); // never returns
+    }
+    // UNAUTHORIZED: return as-is so callers can handle cleanly
   }
 
   const isJson = isJsonResponse(res);
@@ -277,7 +294,10 @@ async function fetchWithCsrf(
     const newToken = await ensureCsrfToken();
     const retryResponse = await executeRequest(newToken);
     if (retryResponse.status === 401) {
-      handleSessionExpired(); // never returns
+      const retryCode = await getResponseErrorCode(retryResponse);
+      if (retryCode !== 'UNAUTHORIZED') {
+        handleSessionExpired(); // never returns
+      }
     }
     if (retryResponse.ok) {
       recordAuthenticatedSuccess();
@@ -302,9 +322,14 @@ export async function apiGet(endpoint: string): Promise<Response> {
   }
   res = await recoverAuthFailureResponse(endpoint, executeRequest, res);
 
-  // Handle session expiration - redirect to login
+  // Handle session expiration - redirect to login.
+  // Don't treat UNAUTHORIZED (no session) as expiry — that's a fresh login with no prior session.
   if (res.status === 401) {
-    handleSessionExpired(); // never returns
+    const code = await getResponseErrorCode(res);
+    if (code !== 'UNAUTHORIZED') {
+      handleSessionExpired(); // never returns
+    }
+    // UNAUTHORIZED: return as-is; ProtectedRoute will redirect cleanly without "expired" message
   }
 
   // Check for non-JSON response (CloudFront HTML interception)
