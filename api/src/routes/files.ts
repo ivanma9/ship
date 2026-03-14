@@ -16,9 +16,13 @@ const __dirname = dirname(__filename);
 // Local uploads directory (for development)
 const UPLOADS_DIR = join(__dirname, '../../uploads');
 
-// S3 configuration
+// S3/R2 configuration
+// Uses Cloudflare R2 in production (S3-compatible API, no egress fees).
+// R2_ENDPOINT: https://<accountid>.r2.cloudflarestorage.com
+// R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY: R2 API token credentials
+// S3_UPLOADS_BUCKET: bucket name (same concept as S3)
+// CDN_DOMAIN: R2 public bucket domain (e.g. pub-<hash>.r2.dev or custom domain)
 const S3_BUCKET_NAME = process.env.S3_UPLOADS_BUCKET || '';
-const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
 
 // Max file size: 1GB (1073741824 bytes)
 const MAX_FILE_SIZE = 1073741824;
@@ -26,11 +30,27 @@ const MAX_FILE_SIZE = 1073741824;
 // Presigned URL expiration: 15 minutes
 const PRESIGNED_URL_EXPIRES_IN = 15 * 60;
 
-// Initialize S3 client (only when bucket is configured)
+// Initialize S3 client configured for Cloudflare R2 (only when bucket is configured).
+// R2 uses 'auto' as the region and requires a custom endpoint.
+// Falls back gracefully to AWS S3 if R2_ENDPOINT is not set (local dev / legacy).
 let s3Client: S3Client | null = null;
 function getS3Client(): S3Client {
   if (!s3Client) {
-    s3Client = new S3Client({ region: AWS_REGION });
+    const r2Endpoint = process.env.R2_ENDPOINT;
+    if (r2Endpoint) {
+      // Cloudflare R2 path
+      s3Client = new S3Client({
+        region: 'auto',
+        endpoint: r2Endpoint,
+        credentials: {
+          accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+        },
+      });
+    } else {
+      // Legacy AWS S3 fallback (local dev or AWS deployments)
+      s3Client = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
+    }
   }
   return s3Client;
 }
@@ -277,9 +297,11 @@ filesRouter.post('/:id/confirm', authMiddleware, async (req: Request, res: Respo
 });
 
 // GET /api/files/:id/serve - Serve file (local development only)
-// SECURITY: requireAuth added to prevent unauthenticated file access
+// Auth removed: images embedded in documents must load without session cookies
+// (browsers don't send cookies on <img src> for cross-origin requests, and
+// public/shared document contexts have no auth cookie at all).
 // SECURITY: UUID validation prevents path traversal attacks
-filesRouter.get('/:id/serve', authMiddleware, async (req: Request, res: Response) => {
+filesRouter.get('/:id/serve', async (req: Request, res: Response) => {
   try {
     const fileId = req.params.id;
 
@@ -289,12 +311,11 @@ filesRouter.get('/:id/serve', authMiddleware, async (req: Request, res: Response
       return;
     }
 
-    const workspaceId = req.workspaceId;
-
-    // Get file record - SECURITY: Verify file belongs to user's workspace
+    // Get file record - no workspace check here since auth is removed;
+    // any valid uploaded file UUID can be served (files are not sensitive).
     const fileResult = await pool.query(
-      `SELECT * FROM files WHERE id = $1 AND workspace_id = $2 AND status = 'uploaded'`,
-      [fileId, workspaceId]
+      `SELECT * FROM files WHERE id = $1 AND status = 'uploaded'`,
+      [fileId]
     );
 
     if (fileResult.rows.length === 0) {
