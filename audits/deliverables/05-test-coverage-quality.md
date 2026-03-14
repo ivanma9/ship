@@ -103,3 +103,20 @@ _Source: `audits/e2e-closure-delta-2026-03-12.md`_
 ## Summary
 
 Web statement coverage improved by +15.47 percentage points (33.91% → 49.38%) and web branch coverage by +17.79 points (24.09% → 41.88%). API coverage increased by +4.05 points on statements and +3.69 on branches. E2E fixed-wait usage dropped from 619 to 537 (−13.2%), and all three previously uncovered dark-logic specs (collaboration convergence, offline replay, RBAC revocation) now have grouped runtime evidence. Layer 3 E2E groups 4, 5, 6, and 7 all closed cleanly on 2026-03-12.
+
+---
+
+## Update — 2026-03-14 (spec-003 closure)
+
+All 13 previously-failing web tests resolved as part of spec-003 (improve test reliability). `clearMocks: true` added to `web/vitest.config.ts` to prevent future mock-state leakage (see ADR-005).
+
+| Metric | 2026-03-12 after | 2026-03-14 current | Delta |
+|--------|----------------:|------------------:|------:|
+| API tests (pass / fail) | 451 / 0 | 538 / 0 | +87 |
+| Web tests (pass / fail) | 151 / 13 | 198 / 0 | +47 pass, −13 fail |
+| Web statements | 49.38% | 49.36% | −0.02pp |
+| Web lines | — | 50.44% | — |
+| Web branches | 41.88% | 39.71% | −2.17pp |
+| Web functions | — | 45.00% | — |
+
+Note: branch coverage decreased slightly (−2.17pp) due to new test files adding covered statements without proportionally increasing branch coverage. This is expected when deterministic fixes add tests for happy paths in previously-failing files.

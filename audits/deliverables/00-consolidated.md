@@ -459,6 +459,6 @@ Roll-up table showing the single most important metric per category, before/afte
 | 2 | Bundle Size | Entry chunk gzip size | 587.59 KB | 259.97 KB | −55.8% |
 | 3 | API Response Time | `/api/documents?type=wiki` P95 at c50 | 123 ms | 8 ms | −93.5% |
 | 4 | Database Query Efficiency | Search content query execution time | 0.979 ms | 0.360 ms | −63.2% |
-| 5 | Test Coverage and Quality | Web statement coverage | 33.91% | 49.38% | +45.6% |
+| 5 | Test Coverage and Quality | Web statement coverage | 33.91% | 49.36% (198 tests, 0 failing) | +45.5% |
 | 6 | Runtime Errors and Edge Cases | Browser console `error` entries per session | 24 | ≤ 5 (target) | −79% (target) |
 | 7 | Accessibility Compliance | Total Serious violations (axe) | 34 | 0 | −100% |
