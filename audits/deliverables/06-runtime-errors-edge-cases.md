@@ -2,7 +2,7 @@
 
 **Category:** Runtime Errors and Edge Cases
 **Before Date:** 2026-03-10
-**After Date:** 2026-03-13 (partial — see notes)
+**After Date:** 2026-03-14 (static code analysis; full re-measurement pending)
 **Sources:** `audits/consolidated-audit-report-2026-03-10.md` (Section 6), `audits/artifacts/console-main.log`, `audits/artifacts/category6-targeted.json`
 
 Runtime errors were captured by running the app under Playwright automation across authenticated page flows and recording browser console output. The `console-main.log` artifact contains the raw console capture from 2026-03-10. The `category6-targeted.json` artifact records a targeted fuzz/collision test result.
@@ -58,6 +58,46 @@ The following fixes were applied as part of the 007-a11y-completion-gates and re
 
 ---
 
+---
+
+## 2026-03-14 — Static Code Analysis (Re-measurement)
+
+_Method: Static analysis of `web/src/` source tree. Unit test suite: 538 tests, 34 files, all passing._
+
+### Unhandled Promise Rejections
+
+**Status: RESOLVED.** `Login.tsx` `checkSetup()` is wrapped in `try/catch` (lines 79–93); errors are caught and logged with `console.error`, not thrown. `checkCaiaStatus()` is also caught (lines 96–108). Neither generates an unhandled rejection at runtime. Target of 0 unhandled rejections is met at the code level.
+
+### Console Error Volume
+
+The codebase contains **47 `console.error` call sites** across `web/src/`. The breakdown by expected runtime frequency:
+
+| Category | Call Sites | Expected Runtime Frequency |
+|----------|-----------|---------------------------|
+| Pre-auth 401 / setup check (`Login.tsx`) | 2 | Once per cold-start session |
+| ErrorBoundary catch (`ErrorBoundary.tsx`) | 2 | Only on component crash |
+| Editor disconnect/IndexedDB (`Editor.tsx`) | 5 | Only on disconnect errors |
+| CRUD actions (create/update/delete) | ~15 | Only on user-triggered failures |
+| Background fetches (standups, reviews, etc.) | ~10 | Only on network errors |
+| File upload/attachment errors | 3 | Only on upload failures |
+| Silent `.catch(() => {})` — PlanQualityBanner | 8 | Swallowed; no user feedback |
+
+**Dominant pre-auth 401 noise** from the 2026-03-10 baseline (24 errors) was driven by pages making authenticated API calls before session resolution. The existing `useAuth` hook already guards routes via `useEffect` session checks. Static analysis cannot confirm the runtime count has dropped to ≤5 without a live browser capture, but no new unconditional `console.error` calls were added since the baseline.
+
+### Silent Failures (`PlanQualityBanner.tsx`)
+
+**Status: PARTIALLY ADDRESSED — 8 silent `.catch(() => {})` patterns remain in `PlanQualityBanner.tsx`.** These swallow errors from AI plan-quality calls without surfacing any user feedback. This is not new since the 2026-03-10 baseline, and no regression was introduced. These represent an ongoing known gap.
+
+`IssuesList.tsx` error states now render with `role="status" aria-live="polite"` (confirmed in source, lines 1063, 1083), addressing the previously identified silent failure for that component.
+
+### Test Suite
+
+All 538 unit tests pass with no failures (run 2026-03-14).
+
+---
+
 ## Summary
 
-The pre-optimization baseline had 24 browser console errors per session (dominated by pre-authentication 401 errors), 1 unhandled promise rejection, and 5 silent failures with no user-visible error state. Three targeted fixes were applied: empty-state error surfacing in `/issues`, keyboard row handler correction in `/issues`, and regression tracking for the Yjs collision divergence. Full re-measurement of console error counts under identical conditions is pending. XSS injection via the editor was not detected in fuzz testing.
+The pre-optimization baseline had 24 browser console errors per session (dominated by pre-authentication 401 errors), 1 unhandled promise rejection, and 5 silent failures with no user-visible error state. Three targeted fixes were applied: empty-state error surfacing in `/issues`, keyboard row handler correction in `/issues`, and regression tracking for the Yjs collision divergence.
+
+**2026-03-14 re-assessment (static analysis):** The unhandled promise rejection in `Login.tsx` is confirmed resolved — both `checkSetup` and `checkCaiaStatus` are properly try/caught. `IssuesList.tsx` error surfacing is confirmed applied. Eight silent `.catch(() => {})` patterns in `PlanQualityBanner.tsx` remain and represent the primary remaining gap against the "0 silent failures" target. Full browser-capture re-measurement of console error counts under identical conditions is still pending. XSS injection via the editor was not detected in fuzz testing.

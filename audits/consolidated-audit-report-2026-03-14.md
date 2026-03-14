@@ -68,3 +68,48 @@ Both hotspot queries are within latency targets and have stable plans. A `%ILIKE
 | Accountability action-items | — | 12 | new flow |
 
 Search content -20% gain confirmed stable. Main page query reduction is net -2 vs 2026-03-10 baseline.
+
+---
+
+## 6. Runtime Errors and Edge Cases (Track D)
+
+**Measurement date:** 2026-03-14
+**Method:** Static analysis of `web/src/` source tree + full unit test suite run.
+**Full browser-capture re-measurement:** Pending (requires live Playwright session).
+
+### Prior State (2026-03-10 Baseline)
+
+| Metric | Baseline |
+|--------|---------|
+| Console `error` entries | 24 |
+| Unhandled promise rejections | 1 |
+| Silent failures (no UI feedback) | 5 |
+
+### 2026-03-14 Code-Level Findings
+
+**Unhandled promise rejections — Target: 0 — Status: MET (code level)**
+
+Both async functions in `Login.tsx` that previously generated unhandled rejections are now fully wrapped:
+- `checkSetup()` (lines 79–93): `try/catch` wraps the `fetch`; errors logged, not re-thrown.
+- `checkCaiaStatus()` (lines 96–108): same pattern; uses `console.debug` (not `console.error`) for the unavailable case.
+
+No bare `.then()` chains without `.catch()` were found in auth-critical paths.
+
+**Console error volume — Target: ≤ 5 — Status: UNCONFIRMED (browser capture pending)**
+
+The source contains 47 `console.error` call sites across `web/src/`. Most are conditional — they fire only on network failures or user-triggered errors, not on normal page loads. The pre-auth 401 noise driving the 24-error baseline is structurally reduced by the `useAuth` session guard, but a live browser capture is required to confirm the runtime count is ≤5.
+
+**Silent failures — Target: 0 — Status: PARTIALLY MET**
+
+- `IssuesList.tsx`: error and empty states render with `role="status" aria-live="polite"` (lines 1063, 1083) — confirmed.
+- `PlanQualityBanner.tsx`: 8 `.catch(() => {})` call sites (lines 155, 166, 198, 221, 401, 411, 442, 465) swallow AI plan-quality API errors silently. Primary remaining gap.
+
+**Unit test suite:** 538 tests, 34 files — all passing.
+
+### Assessment
+
+| Metric | Before | Target | 2026-03-14 Code Analysis | Gap |
+|--------|-------:|-------:|--------------------------|-----|
+| Console `error` entries | 24 | ≤ 5 | Structurally reduced; runtime count unconfirmed | Pending live measurement |
+| Unhandled promise rejections | 1 | 0 | 0 (code level confirmed) | None |
+| Silent failures | 5 | 0 | 1 component remaining (`PlanQualityBanner.tsx`) | 8 swallowed catches |
