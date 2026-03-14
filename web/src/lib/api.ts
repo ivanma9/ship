@@ -72,6 +72,14 @@ async function recoverAuthFailureResponse(
     return response;
   }
 
+  // UNAUTHORIZED means no session exists — retrying will never succeed, skip turbulence retries
+  if (response.status === 401) {
+    const code = await getResponseErrorCode(response);
+    if (code === 'UNAUTHORIZED') {
+      return response;
+    }
+  }
+
   if (authTurbulenceStartedAt === null) {
     authTurbulenceStartedAt = Date.now();
     console.warn(`[api] Deferring auth redirect during reconnect turbulence for ${endpoint}`);
