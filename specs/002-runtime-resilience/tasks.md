@@ -30,10 +30,10 @@
 
 **⚠️ CRITICAL**: No user story work should start until this phase is complete.
 
-- [ ] T005 Update shared error-code and API schema expectations in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/shared/src/constants.ts` and `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/api/src/openapi/schemas/documents.ts`
+- [x] T005 Update shared error-code and API schema expectations in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/shared/src/constants.ts` and `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/api/src/openapi/schemas/documents.ts`
 - [X] T006 [P] Extend typed request-error parsing for conflict metadata in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/lib/http-error.ts`
 - [X] T007 [P] Add reusable runtime resilience logging and measurement hooks in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/api/src/routes/documents.ts` and `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/lib/api.ts`
-- [ ] T008 Define shared test data expectations for runtime resilience scenarios in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/e2e/fixtures/isolated-env.ts`
+- [x] T008 Define shared test data expectations for runtime resilience scenarios in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/e2e/fixtures/isolated-env.ts`
 
 **Checkpoint**: Shared contracts, parsing, logging, and fixture expectations are ready for story work.
 
@@ -48,7 +48,7 @@
 ### Tests for User Story 1
 
 - [X] T009 [P] [US1] Add API regression tests for fresh title CAS, stale title conflict, and idempotent retry in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/api/src/routes/documents.test.ts`
-- [ ] T010 [P] [US1] Add client conflict parsing and retry-state tests in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/lib/http-error.test.ts` and `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/components/UnifiedEditor.conflict.test.tsx`
+- [x] T010 [P] [US1] Add client conflict parsing and retry-state tests in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/lib/http-error.test.ts` and `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/components/UnifiedEditor.conflict.test.tsx`
 - [X] T011 [P] [US1] Add E2E coverage for concurrent title edits in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/e2e/runtime-resilience-title-conflict.spec.ts`
 
 ### Implementation for User Story 1
@@ -77,8 +77,8 @@
 ### Implementation for User Story 2
 
 - [X] T019 [US2] Refactor reconnect turbulence state, bounded retry gating, and deferred redirect circuit breaking in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/lib/api.ts`
-- [ ] T020 [P] [US2] Coordinate editor-visible save/session status with reconnect turbulence outcomes in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/components/Editor.tsx`
-- [ ] T021 [US2] Preserve existing non-turbulence auth-expiry redirect behavior and return-to semantics in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/pages/App.tsx`
+- [x] T020 [P] [US2] Coordinate editor-visible save/session status with reconnect turbulence outcomes in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/components/Editor.tsx`
+- [x] T021 [US2] Preserve existing non-turbulence auth-expiry redirect behavior and return-to semantics in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/pages/App.tsx`
 
 **Checkpoint**: Temporary reconnect/auth churn no longer causes redirect storms, while real expiry still redirects correctly.
 
@@ -93,7 +93,7 @@
 ### Tests for User Story 3
 
 - [X] T022 [P] [US3] Add autosave backoff and terminal-failure hook tests in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/hooks/useAutoSave.test.ts`
-- [ ] T023 [P] [US3] Add sticky save-failure UI tests in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/components/UnifiedEditor.autosave.test.tsx`
+- [x] T023 [P] [US3] Add sticky save-failure UI tests in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/components/UnifiedEditor.autosave.test.tsx`
 - [X] T024 [P] [US3] Add E2E autosave terminal-failure UX coverage in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/e2e/runtime-resilience-autosave.spec.ts`
 
 ### Implementation for User Story 3
@@ -110,10 +110,10 @@
 
 **Purpose**: Finish observability, accessibility, and verification across all three stories.
 
-- [ ] T028 [P] Capture conflict-rate, reconnect-deferral, and autosave-failure observability evidence in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/specs/002-runtime-resilience/quickstart.md`
-- [ ] T029 [P] Run keyboard and screen-reader-focused accessibility verification for conflict and save-failure alerts in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/components/UnifiedEditor.tsx` and `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/components/Editor.tsx`
+- [x] T028 [P] Capture conflict-rate, reconnect-deferral, and autosave-failure observability evidence in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/specs/002-runtime-resilience/quickstart.md`
+- [x] T029 [P] Run keyboard and screen-reader-focused accessibility verification for conflict and save-failure alerts in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/components/UnifiedEditor.tsx` and `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/web/src/components/Editor.tsx`
 - [X] T030 Run type-check and targeted API/web test suites, then record results in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/specs/002-runtime-resilience/quickstart.md`
-- [ ] T031 Run the required E2E runner for `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/e2e/runtime-resilience-title-conflict.spec.ts`, `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/e2e/runtime-resilience-reconnect.spec.ts`, and `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/e2e/runtime-resilience-autosave.spec.ts`, then record outcomes in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/specs/002-runtime-resilience/quickstart.md`
+- [x] T031 Run the required E2E runner for `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/e2e/runtime-resilience-title-conflict.spec.ts`, `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/e2e/runtime-resilience-reconnect.spec.ts`, and `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/e2e/runtime-resilience-autosave.spec.ts`, then record outcomes in `/Users/ivanma/Desktop/gauntlet/ShipShape/ship/specs/002-runtime-resilience/quickstart.md`
 
 ---
 
