@@ -434,7 +434,7 @@ export function IssuesList({
 
       switch (type) {
         case 'state':
-          bulkUpdate.mutate({ ids: issueIds, action: 'update', updates: { state: actualValue as string } });
+          if (actualValue !== null) bulkUpdate.mutate({ ids: issueIds, action: 'update', updates: { state: actualValue } });
           break;
         case 'sprint':
           bulkUpdate.mutate({ ids: issueIds, action: 'update', updates: { sprint_id: actualValue } });
@@ -1001,7 +1001,8 @@ export function IssuesList({
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
         return;
       }

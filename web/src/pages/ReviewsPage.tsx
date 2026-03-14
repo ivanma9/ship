@@ -331,7 +331,7 @@ export function ReviewsPage() {
         });
       }
 
-      groups.get(groupKey)!.people.push(person);
+      groups.get(groupKey)?.people.push(person);
     }
 
     const sorted = Array.from(groups.values()).sort((a, b) => {
@@ -397,8 +397,9 @@ export function ReviewsPage() {
     for (const person of filteredPeople) {
       for (const week of data.weeks) {
         const cell = data.reviews[person.personId]?.[week.number];
-        if (needsPlanReview(cell)) counts[week.number]!.plans += 1;
-        if (needsRetroReview(cell)) counts[week.number]!.retros += 1;
+        const weekCount = counts[week.number];
+        if (weekCount && needsPlanReview(cell)) weekCount.plans += 1;
+        if (weekCount && needsRetroReview(cell)) weekCount.retros += 1;
       }
     }
 
@@ -544,7 +545,8 @@ export function ReviewsPage() {
       setSelectedCell(null);
     } else {
       // Refresh the cell data from the latest state
-      const nextItem = batchMode.queue[nextIndex]!;
+      const nextItem = batchMode.queue[nextIndex];
+      if (!nextItem) return;
       const freshCell = data?.reviews[nextItem.personId]?.[nextItem.weekNumber];
       const updatedItem = freshCell ? { ...nextItem, cell: freshCell } : nextItem;
       setBatchMode({ ...batchMode, currentIndex: nextIndex });
@@ -1175,7 +1177,7 @@ function ReviewPanel({
         <div className="border-t border-border px-4 py-2 bg-purple-500/5">
           <div className="text-[10px] uppercase tracking-wider text-purple-400 mb-1">Previous Feedback</div>
           <p className="text-xs text-muted">
-            {(isRetroMode ? (selectedCell.cell.reviewApproval as { feedback?: string })?.feedback : (selectedCell.cell.planApproval as { feedback?: string })?.feedback) || 'No feedback provided'}
+            {(isRetroMode ? selectedCell.cell.reviewApproval?.feedback : selectedCell.cell.planApproval?.feedback) || 'No feedback provided'}
           </p>
         </div>
       )}
@@ -1349,29 +1351,32 @@ function ReviewPanel({
   );
 }
 
-/** Renders TipTap JSON content as simple HTML */
-function TipTapContent({ content }: { content: unknown }) {
-  if (!content || typeof content !== 'object') {
-    return <p className="text-sm text-muted italic">Empty</p>;
-  }
+interface TipTapNodeShape {
+  type?: string;
+  content?: TipTapNodeShape[];
+  text?: string;
+  attrs?: Record<string, unknown>;
+  marks?: Array<{ type: string }>;
+}
 
-  const doc = content as { type?: string; content?: unknown[] };
-  if (!doc.content || !Array.isArray(doc.content)) {
+/** Renders TipTap JSON content as simple HTML */
+function TipTapContent({ content }: { content: { type?: string; content?: TipTapNodeShape[] } | null | undefined }) {
+  if (!content?.content || !Array.isArray(content.content)) {
     return <p className="text-sm text-muted italic">Empty</p>;
   }
 
   return (
     <div className="text-sm text-foreground space-y-2">
-      {doc.content.map((node, i) => (
+      {content.content.map((node, i) => (
         <TipTapNode key={i} node={node} />
       ))}
     </div>
   );
 }
 
-function TipTapNode({ node }: { node: unknown }) {
+function TipTapNode({ node }: { node: TipTapNodeShape }) {
   if (!node || typeof node !== 'object') return null;
-  const n = node as { type?: string; content?: unknown[]; text?: string; attrs?: Record<string, unknown>; marks?: Array<{ type: string }> };
+  const n = node;
 
   if (n.type === 'text') {
     let text = <>{n.text}</>;
@@ -1388,7 +1393,8 @@ function TipTapNode({ node }: { node: unknown }) {
 
   switch (n.type) {
     case 'heading': {
-      const level = (n.attrs?.level as number) || 2;
+      const levelVal = n.attrs?.level;
+      const level = typeof levelVal === 'number' ? levelVal : 2;
       if (level === 1) return <h3 className="text-base font-semibold text-foreground">{children}</h3>;
       if (level === 2) return <h4 className="text-sm font-semibold text-foreground">{children}</h4>;
       return <h5 className="text-sm font-medium text-foreground">{children}</h5>;

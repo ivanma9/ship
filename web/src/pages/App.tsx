@@ -773,9 +773,9 @@ function DocumentTreeItem({
     navigate(`/documents/${document.id}`);
   }, [document.id, navigate, closeContextMenu]);
 
-  const handleChangeVisibility = useCallback(async (visibility: string) => {
+  const handleChangeVisibility = useCallback(async (visibility: 'private' | 'workspace') => {
     closeContextMenu();
-    await updateDocument(document.id, { visibility: visibility as 'private' | 'workspace' });
+    await updateDocument(document.id, { visibility });
     showToast(`Visibility changed to ${visibility}`, 'success');
   }, [document.id, updateDocument, showToast, closeContextMenu]);
 
