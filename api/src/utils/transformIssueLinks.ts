@@ -11,7 +11,7 @@
 
 import { pool } from '../db/client.js';
 
-interface TipTapNode {
+export interface TipTapNode {
   type: string;
   content?: TipTapNode[];
   text?: string;
@@ -19,7 +19,7 @@ interface TipTapNode {
   attrs?: Record<string, unknown>;
 }
 
-interface TipTapDoc {
+export interface TipTapDoc {
   type: 'doc';
   content?: TipTapNode[];
 }
@@ -203,15 +203,15 @@ export async function transformIssueLinks(
   content: unknown,
   workspaceId: string,
   preloadedIssueMap?: Map<number, IssueInfo>
-): Promise<unknown> {
-  if (!content || typeof content !== 'object') return content;
+): Promise<TipTapDoc> {
+  if (!content || typeof content !== 'object') return content as TipTapDoc;
 
   const doc = content as TipTapDoc;
-  if (doc.type !== 'doc' || !Array.isArray(doc.content)) return content;
+  if (doc.type !== 'doc' || !Array.isArray(doc.content)) return content as TipTapDoc;
 
   // Extract all ticket numbers from content
   const ticketNumbers = extractAllTicketNumbers(doc.content);
-  if (ticketNumbers.length === 0) return content;
+  if (ticketNumbers.length === 0) return content as TipTapDoc;
 
   // Use preloaded map if provided, otherwise look up
   let issueMap: Map<number, IssueInfo>;
@@ -228,7 +228,7 @@ export async function transformIssueLinks(
     issueMap = await lookupIssuesByTicketNumbers(workspaceId, ticketNumbers);
   }
 
-  if (issueMap.size === 0) return content;
+  if (issueMap.size === 0) return content as TipTapDoc;
 
   // Transform the content
   return {
