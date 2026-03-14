@@ -71,3 +71,47 @@ Static analysis of `web/src/` was performed against 538 passing unit tests.
 ### Full Deliverable
 
 See `audits/deliverables/06-runtime-errors-edge-cases.md` for complete before/after analysis and fix evidence.
+
+---
+
+## Track C — Login Redirect Fix
+
+**Category:** Runtime / UX
+**Status:** No fix required — implementation was already fully present as of 2026-03-14 audit
+
+### Issue Description
+
+The login redirect flow was suspected to be broken: after a session inactivity timeout (15-min inactivity / 12-hr absolute), users might land on `/` instead of the originally visited URL after re-authenticating.
+
+### Verification Performed
+
+Static analysis of the relevant source files confirmed the full `returnTo` flow is implemented and correct.
+
+**`web/src/pages/App.tsx` (lines 62–64):** On session timeout, `App.tsx` captures the full current URL (`pathname + search + hash`) and encodes it as a `returnTo` query parameter before redirecting to `/login?expired=true&returnTo=<encoded>`.
+
+**`web/src/lib/api.ts` (lines 192–195):** The API layer also captures `returnTo` when a 401 response triggers a session redirect, producing the same `/login?expired=true&returnTo=...` pattern.
+
+**`web/src/pages/Login.tsx` (lines 9–10, 61–74):**
+- `isValidReturnTo(url)` (line 10) validates that the decoded URL is same-origin (no host component), blocking open-redirect attacks.
+- `useMemo` at line 62 reads the `returnTo` query param, decodes it, validates it via `isValidReturnTo`, and falls back to `/` if invalid or absent.
+- The resolved `from` value (line 74) is then used as the post-login redirect target.
+
+### E2E Test Evidence
+
+`e2e/session-timeout.spec.ts` contains three directly relevant tests:
+
+| Lines | Test Name | What It Proves |
+|-------|-----------|----------------|
+| 473–485 | `returns user to original page after re-login` | After login with a valid `returnTo=/docs`, the browser lands at `/docs` |
+| 487–503 | `returnTo only works for same-origin URLs (security)` | An external `returnTo=https://evil.com/phishing` is rejected; user lands on `localhost`, not `evil.com` |
+| 465–471 | `shows "session expired" message on login page after timeout` | The `?expired=true` flag triggers the session-expired UI |
+
+### Security Validation
+
+`isValidReturnTo` in `web/src/pages/Login.tsx` (line 10) constructs a `URL` object and checks that `parsed.host` is empty — meaning only relative paths (no scheme/host) are accepted. Absolute URLs to any external domain are silently discarded and the fallback `/` is used.
+
+### Resolution
+
+Feature was **already fully implemented** prior to the 2026-03-14 audit. No code changes were required. The `returnTo` flow, same-origin validation, and E2E coverage were all present and correct. The TODO item is marked complete.
+
+**Date:** 2026-03-14
