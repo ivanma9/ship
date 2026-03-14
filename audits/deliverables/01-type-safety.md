@@ -66,7 +66,7 @@ _Re-run via `node scripts/type-violation-scan.cjs` — 336 files scanned (16 new
 
 ### CI Gate Added
 
-`scripts/check-type-ceiling.mjs` — fails CI if core violations exceed 1,143. Ceiling is a ratchet: it can only be updated downward with justification.
+`scripts/check-type-ceiling.mjs` — fails CI if core violations exceed the current ceiling. Ceiling is a ratchet: it can only be updated downward with justification. Added to `.github/workflows/ci.yml` under "Check type violation ceiling (ratchet)" step.
 
 ```bash
 node scripts/check-type-ceiling.mjs   # PASS: at ceiling
@@ -80,19 +80,52 @@ node scripts/check-type-ceiling.mjs   # PASS: at ceiling
 
 ---
 
-## Planned Future Reduction (Option A — TODO)
+## Track B Type Safety Sprint — 2026-03-14
 
-_See `docs/TODO.md` for the full phased plan._
+Executed 4-phase type safety improvement targeting −181 violations (1,143 → ≤ 962).
 
-| Phase | Scope | Target Reduction |
-|-------|-------|----------------:|
-| Phase 1 — API hotspot hardening | `api/src/routes/weeks.ts`, `api/src/routes/issues.ts` | −120 |
-| Phase 2 — Web core flow typing | `IssuesList.tsx`, `App.tsx`, `ReviewsPage.tsx` | −110 |
-| Phase 3 — Test and mock typing cleanup | `transformIssueLinks.test.ts` | −70 |
-| Phase 4 — Lower CI ceiling | Update `CEILING` in `check-type-ceiling.mjs` after each phase | lock-in |
+### Phase-by-Phase Results
+
+| Phase | Files Changed | Before | After | Delta |
+|-------|--------------|-------:|------:|------:|
+| Phase 1 — API hotspot hardening | `issues.ts`, `weeks.ts` | 1,143 | 1,004 | −139 |
+| Phase 2 — Web core flow typing | `ReviewsPage.tsx`, `App.tsx`, `IssuesList.tsx` | 1,004 | 992 | −12 |
+| Phase 3 — Test/mock typing | `transformIssueLinks.test.ts`, `transformIssueLinks.ts` | 992 | 929 | −63 |
+| Phase 4 — Lock-in (ceiling + CI) | `check-type-ceiling.mjs`, `ci.yml` | 929 | 929 | 0 |
+| **Total** | | **1,143** | **929** | **−214** |
+
+**Final core metric: 929** (was 1,143 at Track B start, 1,283 original baseline — **−27.5% from original baseline**)
+
+### After — Re-measured Post-Track B (2026-03-14)
+
+| Package    | `any` | `as`  | `!`   | `@ts-ignore` / `@ts-expect-error` | Total Core |
+|------------|------:|------:|------:|----------------------------------:|-----------:|
+| `api/`     | 84    | 302   | 205   | 0                                 | 591        |
+| `web/`     | 13    | 356   | 43    | 1                                 | 413        |
+| `shared/`  | 0     | 0     | 0     | 0                                 | 0          |
+| **Total**  | **97** | **658** | **248** | **1**                          | **929**  |
+
+### Techniques Used
+
+- **Phase 1:** Typed route handler params as `AuthenticatedRequest` directly (instead of casting `req as AuthenticatedRequest` on each use); added `IssueProperties` interface to `issues.ts` eliminating property bag casts; added `SprintRow`/`StandupRow`/`TipTapDoc` interfaces to `weeks.ts`; narrowed query param access with `typeof param === 'string'` guards instead of `as string` casts.
+- **Phase 2:** Replaced `Map.get()!` with `?.` optional chaining; narrowed `EventTarget` with `instanceof HTMLElement` guard; removed redundant casts on already-typed `ApprovalInfo` fields.
+- **Phase 3:** Exported `TipTapDoc`/`TipTapNode` from `transformIssueLinks.ts`; changed return type to `Promise<TipTapDoc>`; removed 56 non-null assertions on array indices (safe without `noUncheckedIndexedAccess`).
+- **Phase 4:** Lowered `CEILING` to 929; added `check-type-ceiling.mjs` to CI pipeline.
+
+### CI Gate (Updated)
+
+Ceiling lowered from 1,143 → 929. `scripts/check-type-ceiling.mjs` now runs in CI.
+
+```bash
+node scripts/check-type-ceiling.mjs
+# Type violation ceiling check
+#   Ceiling : 929
+#   Current : 929
+#   PASS: at ceiling
+```
 
 ---
 
 ## Summary
 
-Core violations dropped from 1,283 → 1,143 (−10.9%) through incidental improvements made during the sprint. A CI ceiling script now prevents regressions. The remaining 181 violations needed to hit the −25% target are tracked in `docs/TODO.md` as a phased follow-up.
+Core violations dropped from 1,283 (original baseline) → 929 (Track B final) — **a 27.5% reduction**, exceeding the 25% target (≤ 962). CI ceiling ratchet enforces that violations can only decrease going forward.

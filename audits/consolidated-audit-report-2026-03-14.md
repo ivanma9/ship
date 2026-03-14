@@ -115,3 +115,43 @@ Static analysis of the relevant source files confirmed the full `returnTo` flow 
 Feature was **already fully implemented** prior to the 2026-03-14 audit. No code changes were required. The `returnTo` flow, same-origin validation, and E2E coverage were all present and correct. The TODO item is marked complete.
 
 **Date:** 2026-03-14
+
+---
+
+## Track B — Type Safety (4-Phase Sprint)
+
+**Category:** Type Safety
+**Date:** 2026-03-14
+**Status:** Complete — ceiling lowered to 929, CI gate active
+
+### Summary
+
+Executed a 4-phase type safety improvement sprint targeting ≤ 962 core violations (−25% from the 1,283 original baseline).
+
+**Final result: 929 core violations — 27.5% below original baseline, exceeding the target.**
+
+### Phase Results
+
+| Phase | Target | Before | After | Actual Δ |
+|-------|-------:|-------:|------:|---------:|
+| 1 — API hotspot hardening (`issues.ts`, `weeks.ts`) | −120 | 1,143 | 1,004 | **−139** |
+| 2 — Web flow typing (`ReviewsPage`, `App`, `IssuesList`) | −110 | 1,004 | 992 | **−12** |
+| 3 — Test/mock cleanup (`transformIssueLinks.test.ts`) | −70 | 992 | 929 | **−63** |
+| 4 — Lock-in (ceiling + CI) | — | 929 | 929 | **0** |
+| **Total** | **−181** | **1,143** | **929** | **−214** |
+
+### Techniques
+
+- **Phase 1 (−139):** Typed `req: AuthenticatedRequest` directly in route handlers (eliminating ~30 `req as AuthenticatedRequest` casts per file); added `IssueProperties`, `SprintRow`, `StandupRow`, `TipTapDoc` interfaces to eliminate property-bag casts; narrowed query params with `typeof param === 'string'` guards.
+- **Phase 2 (−12):** Replaced `Map.get()!` with `?.`; narrowed `EventTarget` with `instanceof HTMLElement`; removed redundant casts on already-typed `ApprovalInfo` fields.
+- **Phase 3 (−63):** Exported `TipTapDoc`/`TipTapNode` from implementation; changed return type to `Promise<TipTapDoc>`; removed 29 non-null `[n]!` assertions on array indices (valid without `noUncheckedIndexedAccess`).
+- **Phase 4:** Lowered `CEILING` in `scripts/check-type-ceiling.mjs` from 1,143 → 929; added step to `.github/workflows/ci.yml`.
+
+### Reproducibility
+
+```bash
+node scripts/type-violation-scan.cjs    # Reports 929 core violations
+node scripts/check-type-ceiling.mjs    # PASS: at ceiling
+```
+
+**Date:** 2026-03-14

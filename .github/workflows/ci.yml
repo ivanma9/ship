@@ -44,8 +44,11 @@ jobs:
       - name: Type check
         run: pnpm type-check
 
-      - name: Check type violation ceiling
+      - name: Check type violation ceiling (legacy)
         run: ./scripts/count-type-violations.sh 416
+
+      - name: Check type violation ceiling (ratchet)
+        run: node scripts/check-type-ceiling.mjs
 
       - name: Run database migrations
         run: pnpm db:migrate
