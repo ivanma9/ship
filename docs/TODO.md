@@ -48,6 +48,23 @@ Items deferred from the audit sprint. Each has a clear definition of done.
 
 ---
 
+## Login Redirect Issue
+
+**Current state:** Possible redirect problem after login — destination URL may not be preserved or may redirect incorrectly in certain flows (e.g. deep links, session expiry, OAuth callback).
+
+**Known trigger:** Session inactivity timeout (15-min inactivity / 12-hr absolute) fires and redirects the user to the login page, but the originally requested URL is not preserved — user lands on `/` after re-authenticating instead of where they were.
+
+**What to do:**
+- [ ] Reproduce: stay idle for 15 min on a deep page (e.g. `/issues/123`), wait for inactivity redirect to login, log back in — confirm landing page is `/` not `/issues/123`
+- [ ] Check `web/src/hooks/useSessionTimeout.ts` — verify it captures `window.location.pathname` before redirecting and passes it as a `?returnTo=` param
+- [ ] Check login success handler in `web/src/` — confirm it reads `returnTo` from query params and navigates there after auth
+- [ ] Check `api/src/routes/` for any server-side 401 redirect that might strip the return URL
+- [ ] Identify root cause: missing `returnTo` param, overwritten redirect, or race condition between auth state and router
+- [ ] Fix and verify: after session timeout + re-login, user should land on the originally visited URL
+- [ ] Add an E2E test: navigate to deep link → trigger session expiry → log in → assert correct redirect
+
+---
+
 ## Specs/008 — Image Command Fix
 
 **Current state:** Fix deferred; no before/after proof exists.
