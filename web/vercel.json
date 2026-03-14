@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd .. && pnpm run build:shared && pnpm --filter web build",
+  "installCommand": "cd .. && pnpm install",
+  "outputDirectory": "dist"
+}
