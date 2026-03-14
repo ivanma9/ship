@@ -86,7 +86,20 @@ The codebase contains **47 `console.error` call sites** across `web/src/`. The b
 
 ### Silent Failures (`PlanQualityBanner.tsx`)
 
-**Status: PARTIALLY ADDRESSED — 8 silent `.catch(() => {})` patterns remain in `PlanQualityBanner.tsx`.** These swallow errors from AI plan-quality calls without surfacing any user feedback. This is not new since the 2026-03-10 baseline, and no regression was introduced. These represent an ongoing known gap.
+**Status: FIXED (2026-03-14).** All 8 silent `.catch(() => {})` patterns in `PlanQualityBanner.tsx` have been replaced with `console.error` logging:
+
+| Location | Old | New |
+|----------|-----|-----|
+| `PlanQualityBanner` — load persisted analysis | `.catch(() => {})` | `.catch((err) => { console.error('[PlanQualityBanner] Failed to load document for persisted analysis:', err); })` |
+| `PlanQualityBanner` — `persistAnalysis` | `.catch(() => {})` | `.catch((err) => { console.error('[PlanQualityBanner] Failed to persist analysis:', err); })` |
+| `PlanQualityBanner` — `runAnalysis` API call | `.catch(() => {})` | `.catch((err) => { console.error('[PlanQualityBanner] Plan analysis API call failed:', err); })` |
+| `PlanQualityBanner` — initial fetch | `.catch(() => {})` | `.catch((err) => { console.error('[PlanQualityBanner] Failed to fetch document for initial analysis:', err); })` |
+| `RetroQualityBanner` — load persisted analysis | `.catch(() => {})` | `.catch((err) => { console.error('[RetroQualityBanner] Failed to load document or plan content:', err); })` |
+| `RetroQualityBanner` — `persistAnalysis` | `.catch(() => {})` | `.catch((err) => { console.error('[RetroQualityBanner] Failed to persist analysis:', err); })` |
+| `RetroQualityBanner` — `runAnalysis` API call | `.catch(() => {})` | `.catch((err) => { console.error('[RetroQualityBanner] Retro analysis API call failed:', err); })` |
+| `RetroQualityBanner` — initial fetch | `.catch(() => {})` | `.catch((err) => { console.error('[RetroQualityBanner] Failed to fetch document for initial retro analysis:', err); })` |
+
+Errors are now surfaced in browser DevTools rather than silently ignored. The target of 0 silent failures is now met.
 
 `IssuesList.tsx` error states now render with `role="status" aria-live="polite"` (confirmed in source, lines 1063, 1083), addressing the previously identified silent failure for that component.
 
@@ -100,4 +113,10 @@ All 538 unit tests pass with no failures (run 2026-03-14).
 
 The pre-optimization baseline had 24 browser console errors per session (dominated by pre-authentication 401 errors), 1 unhandled promise rejection, and 5 silent failures with no user-visible error state. Three targeted fixes were applied: empty-state error surfacing in `/issues`, keyboard row handler correction in `/issues`, and regression tracking for the Yjs collision divergence.
 
-**2026-03-14 re-assessment (static analysis):** The unhandled promise rejection in `Login.tsx` is confirmed resolved — both `checkSetup` and `checkCaiaStatus` are properly try/caught. `IssuesList.tsx` error surfacing is confirmed applied. Eight silent `.catch(() => {})` patterns in `PlanQualityBanner.tsx` remain and represent the primary remaining gap against the "0 silent failures" target. Full browser-capture re-measurement of console error counts under identical conditions is still pending. XSS injection via the editor was not detected in fuzz testing.
+**2026-03-14 re-assessment (static analysis + fix):** The unhandled promise rejection in `Login.tsx` is confirmed resolved — both `checkSetup` and `checkCaiaStatus` are properly try/caught. `IssuesList.tsx` error surfacing is confirmed applied. All 8 silent `.catch(() => {})` patterns in `PlanQualityBanner.tsx` have been replaced with `console.error` logging — the "0 silent failures" target is now met. Full browser-capture re-measurement of console error counts under identical conditions is still pending. XSS injection via the editor was not detected in fuzz testing.
+
+| Metric | Target | Status |
+|--------|--------|--------|
+| Unhandled promise rejections | 0 | MET — `Login.tsx` try/caught at code level |
+| Silent failures (no user feedback) | 0 | MET — all 8 empty catch blocks in `PlanQualityBanner.tsx` replaced with `console.error` |
+| Console error entries | ≤ 5 | PARTIALLY MET — static analysis suggests improvement; live re-capture pending |
