@@ -18,7 +18,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:orphan-check": "tsx src/db/scripts/orphan-diagnostic.ts",
     "openapi:generate": "tsx src/scripts/generate-openapi.ts",
-    "mcp": "tsx src/mcp/server.ts"
+    "mcp": "tsx src/mcp/server.ts",
+    "lint": "eslint src"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "7",
