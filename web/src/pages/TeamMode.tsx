@@ -515,6 +515,7 @@ export function TeamModePage() {
       const timer = setTimeout(() => setError(null), 3000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [error]);
 
   if (loading) {

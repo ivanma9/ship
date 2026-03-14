@@ -85,6 +85,7 @@ function findListItems(doc: ProseMirrorNode): Array<{ endPos: number; text: stri
       }
       return false;
     }
+    return undefined;
   });
 
   return items;
@@ -106,6 +107,7 @@ function findPlanReferenceNodes(doc: ProseMirrorNode): Array<{ endPos: number; t
       }
       return false;
     }
+    return undefined;
   });
 
   return items;
