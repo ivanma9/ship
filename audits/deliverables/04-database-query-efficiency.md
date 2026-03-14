@@ -73,3 +73,72 @@ _Source: `audits/artifacts/db-query-efficiency-after.json` (captured 2026-03-13T
 ## Summary
 
 The search content flow was the primary target and met the 20% query reduction goal: 5 queries → 4 queries (−20%) by merging the people and document search into a single combined CTE query, reducing execution time by 63.2% (0.979 ms → 0.360 ms). The N+1 pattern on the main page was reduced by 1 query but the pattern remains present. Other flows (view document, list issues, sprint board) were unchanged.
+
+---
+
+## 2026-03-14 Re-Baseline and EXPLAIN ANALYZE (T001, T002)
+
+_Source: `audits/artifacts/db-query-efficiency-baseline.json` (re-captured 2026-03-14T16:33:08Z after fresh seed)_
+
+### Re-Baseline — Query Counts per User Flow
+
+| User Flow | Total Queries | Slowest Query (ms) | N+1 Detected? | Repeated Query Count |
+|-----------|-------------:|-------------------:|:-------------:|---------------------:|
+| Load main page | 52 | 4.12 | Yes | 9 |
+| View a document | 16 | 2.49 | No | 4 |
+| List issues | 17 | 4.11 | No | 4 |
+| Load sprint board | 16 | 1.98 | No | 3 |
+| Accountability action-items | 12 | 1.38 | No | 2 |
+| Search content | 4 | 1.40 | No | 1 |
+
+**Observation:** Search content is already at 4 queries (the post-optimization level). The accountability flow dropped from 13 to 12 queries vs the 2026-03-13 after run. The main page N+1 (9 repeated queries) persists.
+
+### EXPLAIN ANALYZE — Search Content (Merged CTE Query)
+
+Run against `ship_master` with seeded data on 2026-03-14:
+
+```
+Execution Time: 0.229 ms
+Planning Time:  1.537 ms
+Plan: Sort → Append → (WindowAgg+IncrementalSort on person bitmap scan) + (WindowAgg+IncrementalSort on doc seq scan)
+```
+
+| Metric | Value |
+|--------|------:|
+| Execution time | 0.229 ms |
+| Planning time | 1.537 ms |
+| Plan type | Bitmap Index Scan (people) + Seq Scan (documents, 4 types) |
+| Result rows | 0 (empty seeded search; plan is stable) |
+
+**Assessment:** 0.229 ms execution time is well within the latency target (< 5 ms). The plan uses `idx_documents_person_user_id` bitmap index for person lookups and a seq scan for documents (appropriate given the small local dataset and `ILIKE '%a%'` wildcard that precludes B-tree prefix optimization). The plan is **stable** across runs.
+
+### EXPLAIN ANALYZE — Accountability Hotspot (Sprint Batched Query)
+
+Run against `ship_master` with seeded data on 2026-03-14:
+
+```
+Execution Time: 0.109 ms
+Planning Time:  2.086 ms
+Plan: Hash Right Join (document_associations ⋈ sprint documents)
+```
+
+| Metric | Value |
+|--------|------:|
+| Execution time | 0.109 ms |
+| Planning time | 2.086 ms |
+| Plan type | Hash Right Join (sprint docs → document_associations) |
+| Result rows | 0 (empty for this workspace/sprint combination) |
+
+**Assessment:** 0.109 ms is well within target. The plan uses a Hash Join between documents and document_associations — correct and stable for this query shape.
+
+### T012 Decision — Conditional Title-Search Index
+
+**Outcome: T012 SKIPPED / N/A**
+
+Evidence:
+- Search content flow latency: 0.229 ms (target: < 5 ms) — **target met**
+- Accountability sprint query latency: 0.109 ms — **target met**
+- Both plans are stable (consistent across repeated audit runs: 2026-03-13 after2.json and 2026-03-14 re-baseline)
+- The `%ILIKE%` wildcard in title search means a B-tree title index would not be used by the planner; a GIN `pg_trgm` index would be needed, which is a larger change with more risk and is not justified by current latency
+
+**No migration `038_query_efficiency_indexes.sql` is needed.** The conditional in T012 ("only if repeated seeded runs or EXPLAIN ANALYZE show the merged search query misses the latency target") is not triggered.
