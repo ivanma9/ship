@@ -5,6 +5,15 @@
 **After Date:** 2026-03-13
 **Sources:** `audits/database-query-efficiency-audit-2026-03-10.md`, `audits/artifacts/db-query-efficiency-baseline.json`, `audits/artifacts/db-query-efficiency-after.json`
 
+**How to Reproduce (EXPLAIN ANALYZE):**
+```bash
+# Pre-requisites: PostgreSQL running, DB seeded
+node audits/scripts/db-query-recheck.mjs
+# Output: audits/artifacts/db-query-recheck-result.json
+```
+
+**Note on query counts:** User flow query counts (5 flows) were captured via server-side `pool.query` instrumentation. Reference artifacts: `audits/artifacts/db-query-efficiency-baseline.json` (before) and `audits/artifacts/db-query-efficiency-after.json` (after).
+
 Query counts were measured by instrumenting `pool.query` at the API layer and replaying five authenticated user flows. Each flow was executed against a locally running API and PostgreSQL instance with seeded data.
 
 ---
