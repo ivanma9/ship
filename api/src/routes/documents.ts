@@ -261,31 +261,24 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     const props = doc.properties || {};
 
-    // Get owner details for projects (owner_id is a user_id, lookup person document by user_id)
-    // Return user_id as id so PersonCombobox can match correctly
+    // Get owner details (unified for projects and sprints)
     let owner: { id: string; name: string; email: string } | null = null;
-    if (doc.document_type === 'project' && props.owner_id) {
-      const ownerResult = await pool.query(
-        `SELECT (d.properties->>'user_id')::text as id, d.title as name, COALESCE(d.properties->>'email', u.email) as email
-         FROM documents d
-         LEFT JOIN users u ON u.id = (d.properties->>'user_id')::uuid
-         WHERE (d.properties->>'user_id')::uuid = $1 AND d.workspace_id = $2 AND d.document_type = 'person'`,
-        [props.owner_id, workspaceId]
-      );
-      if (ownerResult.rows.length > 0) {
-        owner = ownerResult.rows[0];
-      }
-    }
+    const ownerUserId = doc.document_type === 'project'
+      ? props.owner_id
+      : (doc.document_type === 'sprint' && Array.isArray(props.assignee_ids) ? props.assignee_ids[0] : null);
 
-    // Get owner details for sprints (owner stored in assignee_ids[0], consistent with sprints API)
-    // Return user_id as id so Combobox can match correctly
-    if (doc.document_type === 'sprint' && Array.isArray(props.assignee_ids) && props.assignee_ids[0]) {
+    if (ownerUserId) {
       const ownerResult = await pool.query(
-        `SELECT u.id::text as id, d.title as name, COALESCE(d.properties->>'email', u.email) as email
+        `SELECT u.id::text as id,
+                COALESCE(person_doc.title, u.name) as name,
+                COALESCE(person_doc.properties->>'email', u.email) as email
          FROM users u
-         LEFT JOIN documents d ON (d.properties->>'user_id')::uuid = u.id AND d.document_type = 'person' AND d.workspace_id = $2
+         LEFT JOIN documents person_doc
+           ON (person_doc.properties->>'user_id')::uuid = u.id
+           AND person_doc.document_type = 'person'
+           AND person_doc.workspace_id = $2
          WHERE u.id = $1`,
-        [props.assignee_ids[0], workspaceId]
+        [ownerUserId, workspaceId]
       );
       if (ownerResult.rows.length > 0) {
         owner = ownerResult.rows[0];
