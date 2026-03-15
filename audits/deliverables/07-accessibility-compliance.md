@@ -5,7 +5,7 @@
 **After Date:** 2026-03-13
 **Sources:** `audits/accessibility-compliance-audit-2026-03-10.md`, `docs/a11y-manual-validation.md`
 
-Accessibility was measured using Lighthouse (per-page accessibility score), axe (Critical/Serious/Moderate/Minor violations, contrast, ARIA/label checks), and Playwright Tab traversal. The automated audit was run as `SHIP_BASE_URL=http://localhost:5173 node audits/accessibility/run-a11y-audit.mjs` against a locally seeded dev instance. Evidence bundles are in `audits/artifacts/accessibility/results/`.
+Accessibility was measured using Lighthouse (per-page accessibility score), axe (Critical/Serious/Moderate/Minor violations, contrast, ARIA/label checks), and Playwright Tab traversal. The automated audit was run as `SHIP_BASE_URL=http://localhost:5173 node audits/artifacts/accessibility/run-a11y-audit.mjs` against a locally seeded dev instance. Evidence bundles are in `audits/artifacts/accessibility/results/`.
 
 ---
 
@@ -105,3 +105,10 @@ _Source: `docs/a11y-manual-validation.md`_
 ## Summary
 
 All 34 Serious accessibility violations (100% contrast failures) were resolved. The three priority pages (`/dashboard`, `/my-week`, `/issues`) went from Lighthouse 95–96 to 100 with 0 Critical/Serious violations. The remaining three pages (`/projects`, `/programs`, `/team/allocation`) also reached 0 Serious violations after the app-wide contrast sweep. A CI regression gate was added to block new Critical/Serious violations on merge. Full manual screen-reader validation remains pending.
+
+| Metric | Target | Actual | Status |
+|--------|--------|--------|--------|
+| Total Serious violations | 0 | 0 | PASS |
+| Total Critical violations | 0 | 0 | PASS |
+| Pages with Serious violations | 0 | 0 | PASS |
+| Lighthouse score (priority pages) | 100 | 100 | PASS |
