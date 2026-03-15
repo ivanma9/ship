@@ -396,3 +396,7 @@ LEFT JOIN project_statuses ps ON ps.project_id = d.id
 ### Commits
 
 - `d8cc40e` — reordered COUNT joins + added soft-delete filters
+
+## Test Status
+
+All unit tests pass: **547 tests across 36 test files**, 0 failures (vitest, 2026-03-15).

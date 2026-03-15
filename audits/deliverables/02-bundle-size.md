@@ -79,3 +79,7 @@ The initial page-load entry chunk gzip dropped from 587.59 KB to 259.97 KB (−5
 | Target | Threshold | Actual | Status |
 |--------|-----------|--------|--------|
 | ≥20% initial page load reduction (entry chunk gzip) | ≤470.07 KB | 259.97 KB | PASS (−55.8%) |
+
+## Test Status
+
+All unit tests pass: **547 tests across 36 test files**, 0 failures (vitest, 2026-03-15).

@@ -22,7 +22,7 @@ import path from 'path';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ── Ceiling — update this after each improvement sprint ──────────────────────
-const CEILING = 929; // measured 2026-03-14 after Track B type-safety sprint (baseline was 1143)
+const CEILING = 878; // measured 2026-03-15 after Phase 5 API layer type hardening (baseline was 1143)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const output = execSync(`node ${path.join(__dirname, 'type-violation-scan.cjs')} --json`, {

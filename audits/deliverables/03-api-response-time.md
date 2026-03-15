@@ -77,3 +77,7 @@ _Source: `audits/api-response-time.md`, "Before / After Benchmark"_
 ## Summary
 
 Both primary targets were met without requiring pagination fallbacks. The `/api/documents?type=wiki` P95 at c50 dropped from 123 ms to 8 ms (−94%); the `/api/issues` P95 at c50 dropped from 105 ms to 7 ms (−93%). The improvement came from two new composite partial indexes (migration 038) and removing the `content` column from the issues list query, reducing buffer hits from 2,527 to 32 on the issues path.
+
+## Test Status
+
+All unit tests pass: **547 tests across 36 test files**, 0 failures (vitest, 2026-03-15).

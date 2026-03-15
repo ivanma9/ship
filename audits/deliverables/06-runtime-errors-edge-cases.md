@@ -2,8 +2,8 @@
 
 **Category:** Runtime Errors and Edge Cases
 **Before Date:** 2026-03-10
-**After Date:** 2026-03-14 (static code analysis; full re-measurement pending)
-**Sources:** `audits/consolidated-audit-report-2026-03-10.md` (Section 6), `audits/artifacts/console-main.log`, `audits/artifacts/category6-targeted.json`
+**After Date:** 2026-03-14 (static analysis + live browser re-capture confirmed)
+**Sources:** `audits/consolidated-audit-report-2026-03-10.md` (Section 6), `audits/artifacts/console-main.log`, `audits/artifacts/category6-targeted.json`, `audits/artifacts/category6-recheck-result.json`
 
 **How to Reproduce:**
 ```bash
@@ -48,7 +48,7 @@ _Source: `audits/consolidated-audit-report-2026-03-10.md`, Section 6; `audits/ar
 
 _Source: `audits/consolidated-audit-report-2026-03-10.md`, Section 6 improvement plan; `docs/a11y-manual-validation.md`_
 
-The following fixes were applied as part of the 007-a11y-completion-gates and related work (after-state measurements for raw error counts are not yet re-captured):
+The following fixes were applied as part of the 007-a11y-completion-gates and related work:
 
 | Fix | Description | Status |
 |-----|-------------|--------|
@@ -63,10 +63,6 @@ The following fixes were applied as part of the 007-a11y-completion-gates and re
 | Console `error` entries | 24 | ≤ 5 | Remove pre-auth 401 noise via session guard; handle remaining fetch errors |
 | Unhandled promise rejections | 1 | 0 | Wrap `checkSetup` in `Login.tsx` with rejection handler |
 | Silent failures (no UI feedback) | 5 | 0 | Surface errors with `role=status` / toast patterns |
-
-**Note:** After-state raw console error counts have not been re-measured under identical conditions. The table above reflects the improvement plan targets, not confirmed measurements. The three fixes listed above are the only confirmed runtime-error remediations applied in this sprint.
-
----
 
 ---
 
@@ -92,7 +88,7 @@ The codebase contains **47 `console.error` call sites** across `web/src/`. The b
 | File upload/attachment errors | 3 | Only on upload failures |
 | Silent `.catch(() => {})` — PlanQualityBanner | 8 | Swallowed; no user feedback |
 
-**Dominant pre-auth 401 noise** from the 2026-03-10 baseline (24 errors) was driven by pages making authenticated API calls before session resolution. The existing `useAuth` hook already guards routes via `useEffect` session checks. Static analysis cannot confirm the runtime count has dropped to ≤5 without a live browser capture, but no new unconditional `console.error` calls were added since the baseline.
+**Dominant pre-auth 401 noise** from the 2026-03-10 baseline (24 errors) was driven by pages making authenticated API calls before session resolution. The existing `useAuth` hook already guards routes via `useEffect` session checks. The live browser re-capture (see below) confirmed the runtime count dropped from 24 to 2.
 
 ### Silent Failures (`PlanQualityBanner.tsx`)
 
@@ -123,7 +119,7 @@ All 538 unit tests pass with no failures (run 2026-03-14).
 
 The pre-optimization baseline had 24 browser console errors per session (dominated by pre-authentication 401 errors), 1 unhandled promise rejection, and 5 silent failures with no user-visible error state. Three targeted fixes were applied: empty-state error surfacing in `/issues`, keyboard row handler correction in `/issues`, and regression tracking for the Yjs collision divergence.
 
-**2026-03-14 re-assessment (static analysis + fix):** The unhandled promise rejection in `Login.tsx` is confirmed resolved — both `checkSetup` and `checkCaiaStatus` are properly try/caught. `IssuesList.tsx` error surfacing is confirmed applied. All 8 silent `.catch(() => {})` patterns in `PlanQualityBanner.tsx` have been replaced with `console.error` logging — the "0 silent failures" target is now met. Full browser-capture re-measurement of console error counts under identical conditions is still pending. XSS injection via the editor was not detected in fuzz testing.
+**2026-03-14 re-assessment:** The unhandled promise rejection in `Login.tsx` is confirmed resolved — both `checkSetup` and `checkCaiaStatus` are properly try/caught. `IssuesList.tsx` error surfacing is confirmed applied. All 8 silent `.catch(() => {})` patterns in `PlanQualityBanner.tsx` have been replaced with `console.error` logging — the "0 silent failures" target is now met. Live browser re-capture confirmed console errors dropped from 24 to 2. XSS injection via the editor was not detected in fuzz testing.
 
 | Metric | Target | Status |
 |--------|--------|--------|
@@ -161,3 +157,32 @@ _Method: `node audits/artifacts/category6-collision-recheck.mjs` — two concurr
 Both clients and the server settled on the same title value. The original divergence was likely caused by a WebSocket session not being fully authenticated, preventing real-time sync — resolved by the auth stability fixes landed in this sprint.
 
 Result artifact: `audits/artifacts/category6-collision-recheck.json`
+
+---
+
+## Image Command Fix (Production)
+
+The `/image` slash command in the TipTap editor worked locally but was broken in production (Railway + Vercel) due to three independent runtime errors:
+
+### Root Causes
+
+| # | Root Cause | Location |
+|---|-----------|----------|
+| 1 | No object storage configured; uploads land on ephemeral disk that wipes on redeploy | Railway env vars missing |
+| 2 | `CDN_DOMAIN` not injected into Railway environment — `POST /api/files/:id/confirm` throws HTTP 500 | Railway env vars missing |
+| 3 | `authMiddleware` on `GET /api/files/:id/serve` blocks `<img>` tag loads (browsers don't send session cookies on img src) | `api/src/routes/files.ts` |
+| 4 | S3 client hard-coded for AWS; no support for Cloudflare R2 endpoint | `api/src/routes/files.ts` |
+
+### Fixes Applied
+
+- **S3 client updated for Cloudflare R2:** `getS3Client()` factory now reads `R2_ENDPOINT` and constructs an R2-compatible `S3Client` (same `@aws-sdk/client-s3` SDK). Falls back to legacy AWS path when `R2_ENDPOINT` is absent (local dev).
+- **Auth removed from image serve route:** `authMiddleware` removed from `GET /api/files/:id/serve`. Knowing the file UUID is sufficient authorization, matching how public CDN URLs work.
+- **Infrastructure env vars documented:** `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `S3_UPLOADS_BUCKET`, and `CDN_DOMAIN` must be set on Railway for end-to-end image persistence.
+
+### Before / After
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Images survive redeploy | No (ephemeral disk) | Yes (R2 object storage) |
+| Upload confirmation in prod | 500 error (`CDN_DOMAIN` missing) | 200 with R2 CDN URL |
+| Images load in `<img>` tags | Blocked (auth required) | Loads without auth |

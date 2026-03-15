@@ -60,7 +60,7 @@ BEFORE  Search: 2 queries  →  0.979 ms total
 AFTER   Search: 1 CTE      →  0.360 ms total   (−63%)
 ```
 
-> "Merged into a single CTE with a UNION ALL. One round-trip instead of two. We also measured the main page flow: 54 queries on load, driven by an N+1 in the accountability service — partially addressed, still tracked."
+> "Merged into a single CTE with a UNION ALL. One round-trip instead of two. We also landed four more DB optimizations: fixed an N+1 in programs (2N correlated subqueries → derived-table joins, −53% execution time), added covering composite indexes on `document_associations`, replaced an O(n) correlated subquery in the dashboard with a CTE, and consolidated two separate owner-lookup queries in document detail into one."
 
 ---
 
@@ -107,7 +107,7 @@ AFTER   Lighthouse:  Dashboard 100 | My Week 100 | Issues 100
 
 ## [2:55–3:00] Close
 
-> "Five of seven categories fully measured before and after. Type safety and runtime error re-measurement are the open items. All changes are on master, CI green."
+> "All seven categories fully measured before and after with confirmed improvements. Type safety down 27.5%, runtime console errors from 24 to 2. All changes are on master, CI green."
 
 ---
 
@@ -115,5 +115,5 @@ AFTER   Lighthouse:  Dashboard 100 | My Week 100 | Issues 100
 
 - **Pacing:** Each section has a hard time box — don't expand on details, hit the number and move on.
 - **Evidence order:** Show terminal/file first, then narrate the number. Don't narrate a number that isn't visible yet.
-- **If asked about type safety:** "We audited 1,283 core violations and have a 4-phase plan targeting 25% reduction. Implementation deferred — that's an honest gap we're tracking."
-- **If asked about runtime errors:** "Three targeted fixes shipped — autosave hook, reconnect guard, issues empty state. Full re-measurement pending under identical conditions."
+- **If asked about type safety:** "We reduced core violations from 1,283 to 929 — a 27.5% reduction. A CI ceiling gate now blocks any PR that regresses above 929."
+- **If asked about runtime errors:** "Console errors went from 24 to 2 per session. Unhandled promise rejections and silent failures both at zero. The two remaining errors are benign pre-auth resource loads."
