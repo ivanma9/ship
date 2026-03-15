@@ -5,6 +5,16 @@
 **After Date:** 2026-03-14 (static code analysis; full re-measurement pending)
 **Sources:** `audits/consolidated-audit-report-2026-03-10.md` (Section 6), `audits/artifacts/console-main.log`, `audits/artifacts/category6-targeted.json`
 
+**How to Reproduce:**
+```bash
+# Console error count (page traversal — requires pnpm dev running):
+node audits/artifacts/category6-console-recheck.mjs
+# Collision/divergence test:
+node audits/artifacts/category6-collision-recheck.mjs
+# Output: audits/artifacts/category6-recheck-result.json
+#         audits/artifacts/category6-collision-recheck.json
+```
+
 Runtime errors were captured by running the app under Playwright automation across authenticated page flows and recording browser console output. The `console-main.log` artifact contains the raw console capture from 2026-03-10. The `category6-targeted.json` artifact records a targeted fuzz/collision test result.
 
 ---

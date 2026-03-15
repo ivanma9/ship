@@ -5,6 +5,12 @@
 **After Date:** 2026-03-13
 **Sources:** `audits/accessibility-compliance-audit-2026-03-10.md`, `docs/a11y-manual-validation.md`
 
+**How to Reproduce:**
+```bash
+# Pre-requisites: pnpm dev running on :5173, DB seeded
+SHIP_BASE_URL=http://localhost:5173 node audits/artifacts/accessibility/run-a11y-audit.mjs
+```
+
 Accessibility was measured using Lighthouse (per-page accessibility score), axe (Critical/Serious/Moderate/Minor violations, contrast, ARIA/label checks), and Playwright Tab traversal. The automated audit was run as `SHIP_BASE_URL=http://localhost:5173 node audits/artifacts/accessibility/run-a11y-audit.mjs` against a locally seeded dev instance. Evidence bundles are in `audits/artifacts/accessibility/results/`.
 
 ---

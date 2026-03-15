@@ -5,6 +5,13 @@
 **After Date:** 2026-03-13
 **Sources:** `audits/bundle-size-audit-2026-03-09.md`, `audits/bundle-size-audit-after-006.md`
 
+**How to Reproduce:**
+```bash
+pnpm build
+node web/scripts/check-bundle-budget.mjs
+# Output: PASS/FAIL with gzip size vs 275 KB budget
+```
+
 Bundle size was measured by summing exact byte sizes of all files in `web/dist/index.html` and `web/dist/assets/*` after a production `pnpm build`. Entry chunk gzip size was measured by the `web/scripts/check-bundle-budget.mjs` script using Node's `zlib.gzipSync`. The optimization work is on branch `006-bundle-size-reduction`.
 
 ---

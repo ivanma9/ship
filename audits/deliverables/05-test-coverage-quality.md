@@ -5,6 +5,13 @@
 **After Date:** 2026-03-12 (post-implementation)
 **Sources:** `audits/test-coverage-quality-audit-2026-03-10.md`, `audits/coverage-snapshot-before-2026-03-12.md`, `audits/coverage-snapshot-after-2026-03-12.md`, `audits/e2e-closure-delta-2026-03-12.md`
 
+**How to Reproduce:**
+```bash
+pnpm --filter @ship/api test:coverage
+pnpm --filter @ship/web test:coverage
+# E2E fixed-wait count: grep -c "waitForTimeout" e2e/*.spec.ts
+```
+
 Coverage was measured using Vitest with `coverage.provider: 'v8'` via `pnpm --filter @ship/api test:coverage` and `pnpm --filter @ship/web test:coverage`. E2E fixed-wait counts were measured with `rg -n "waitForTimeout\(" e2e/*.spec.ts`.
 
 ---

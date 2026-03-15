@@ -7,7 +7,11 @@
 
 Type-safety violations were counted via an AST-based Node.js script (`scripts/type-violation-scan.cjs`) scanning all `.ts` and `.tsx` source files in `api/`, `web/`, and `shared/` (excluding `.d.ts`). Six categories were measured: `any` types, `as` assertions, non-null assertions (`!`), `@ts-ignore`/`@ts-expect-error` directives, untyped function parameters, and missing explicit return types.
 
-**Reproducibility:** Re-run with `node scripts/type-violation-scan.cjs` from repo root.
+**How to Reproduce:**
+```bash
+node scripts/type-violation-scan.cjs
+# CI gate: node scripts/check-type-ceiling.mjs
+```
 
 ---
 
