@@ -9,6 +9,26 @@ import { logAuditEvent } from '../services/audit.js';
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
 
+const ISSUE_COUNT_JOIN = (workspaceParam: string) => `
+  LEFT JOIN (
+    SELECT da.related_id, COUNT(*) as cnt
+    FROM documents i
+    JOIN document_associations da ON da.document_id = i.id AND da.relationship_type = 'program'
+    WHERE i.document_type = 'issue'
+      AND i.workspace_id = ${workspaceParam}
+    GROUP BY da.related_id
+  ) ic ON ic.related_id = d.id`;
+
+const SPRINT_COUNT_JOIN = (workspaceParam: string) => `
+  LEFT JOIN (
+    SELECT da.related_id, COUNT(*) as cnt
+    FROM documents s
+    JOIN document_associations da ON da.document_id = s.id AND da.relationship_type = 'program'
+    WHERE s.document_type = 'sprint'
+      AND s.workspace_id = ${workspaceParam}
+    GROUP BY da.related_id
+  ) sc ON sc.related_id = d.id`;
+
 // Helper to extract program from row
 function extractProgramFromRow(row: any) {
   const props = row.properties || {};
@@ -77,20 +97,8 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
              COALESCE(sc.cnt, 0) as sprint_count
       FROM documents d
       LEFT JOIN users u ON u.id = COALESCE((d.properties->>'owner_id')::uuid, d.created_by)
-      LEFT JOIN (
-        SELECT da.related_id, COUNT(*) as cnt
-        FROM documents i
-        JOIN document_associations da ON da.document_id = i.id AND da.relationship_type = 'program'
-        WHERE i.document_type = 'issue'
-        GROUP BY da.related_id
-      ) ic ON ic.related_id = d.id
-      LEFT JOIN (
-        SELECT da.related_id, COUNT(*) as cnt
-        FROM documents s
-        JOIN document_associations da ON da.document_id = s.id AND da.relationship_type = 'program'
-        WHERE s.document_type = 'sprint'
-        GROUP BY da.related_id
-      ) sc ON sc.related_id = d.id
+      ${ISSUE_COUNT_JOIN('$1')}
+      ${SPRINT_COUNT_JOIN('$1')}
       WHERE d.workspace_id = $1 AND d.document_type = 'program'
         AND ${VISIBILITY_FILTER_SQL('d', '$2', '$3')}
     `;
@@ -129,20 +137,8 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
               COALESCE(sc.cnt, 0) as sprint_count
        FROM documents d
        LEFT JOIN users u ON u.id = COALESCE((d.properties->>'owner_id')::uuid, d.created_by)
-       LEFT JOIN (
-         SELECT da.related_id, COUNT(*) as cnt
-         FROM documents i
-         JOIN document_associations da ON da.document_id = i.id AND da.relationship_type = 'program'
-         WHERE i.document_type = 'issue'
-         GROUP BY da.related_id
-       ) ic ON ic.related_id = d.id
-       LEFT JOIN (
-         SELECT da.related_id, COUNT(*) as cnt
-         FROM documents s
-         JOIN document_associations da ON da.document_id = s.id AND da.relationship_type = 'program'
-         WHERE s.document_type = 'sprint'
-         GROUP BY da.related_id
-       ) sc ON sc.related_id = d.id
+       ${ISSUE_COUNT_JOIN('$2')}
+       ${SPRINT_COUNT_JOIN('$2')}
        WHERE d.id = $1 AND d.workspace_id = $2 AND d.document_type = 'program'
          AND ${VISIBILITY_FILTER_SQL('d', '$3', '$4')}`,
       [id, workspaceId, userId, isAdmin]
