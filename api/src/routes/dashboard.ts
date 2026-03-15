@@ -146,43 +146,43 @@ router.get('/my-work', authMiddleware, async (req: Request, res: Response) => {
 
     // 2. Get projects owned by current user (not archived)
     const projectsResult = await pool.query(
-      `SELECT d.id, d.title, d.properties,
+      `WITH project_statuses AS (
+        SELECT proj_assoc.related_id as project_id,
+          CASE MAX(
+            CASE
+              WHEN CURRENT_DATE BETWEEN
+                (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7)
+                AND (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7 + 6)
+              THEN 3
+              WHEN CURRENT_DATE < (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7)
+              THEN 2
+              ELSE 1
+            END
+          )
+          WHEN 3 THEN 'active'
+          WHEN 2 THEN 'planned'
+          WHEN 1 THEN 'completed'
+          ELSE NULL
+          END as status
+        FROM documents issue
+        JOIN document_associations sprint_assoc ON sprint_assoc.document_id = issue.id AND sprint_assoc.relationship_type = 'sprint'
+        JOIN documents sprint ON sprint.id = sprint_assoc.related_id AND sprint.document_type = 'sprint'
+        JOIN document_associations proj_assoc ON proj_assoc.document_id = issue.id AND proj_assoc.relationship_type = 'project'
+        JOIN workspaces w ON w.id = issue.workspace_id
+        WHERE issue.workspace_id = $1
+          AND issue.document_type = 'issue'
+        GROUP BY proj_assoc.related_id
+      )
+      SELECT d.id, d.title, d.properties,
               p.title as program_name,
               CASE
                 WHEN d.archived_at IS NOT NULL THEN 'archived'
-                ELSE COALESCE(
-                  (
-                    SELECT
-                      CASE MAX(
-                        CASE
-                          WHEN CURRENT_DATE BETWEEN
-                            (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7)
-                            AND (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7 + 6)
-                          THEN 3
-                          WHEN CURRENT_DATE < (w.sprint_start_date + ((sprint.properties->>'sprint_number')::int - 1) * 7)
-                          THEN 2
-                          ELSE 1
-                        END
-                      )
-                      WHEN 3 THEN 'active'
-                      WHEN 2 THEN 'planned'
-                      WHEN 1 THEN 'completed'
-                      ELSE NULL
-                      END
-                    FROM documents issue
-                    JOIN document_associations sprint_assoc ON sprint_assoc.document_id = issue.id AND sprint_assoc.relationship_type = 'sprint'
-                    JOIN documents sprint ON sprint.id = sprint_assoc.related_id AND sprint.document_type = 'sprint'
-                    JOIN document_associations proj_assoc ON proj_assoc.document_id = issue.id AND proj_assoc.relationship_type = 'project'
-                    JOIN workspaces w ON w.id = d.workspace_id
-                    WHERE proj_assoc.related_id = d.id
-                      AND issue.document_type = 'issue'
-                  ),
-                  'backlog'
-                )
+                ELSE COALESCE(ps.status, 'backlog')
               END as inferred_status
        FROM documents d
        LEFT JOIN document_associations prog_da ON d.id = prog_da.document_id AND prog_da.relationship_type = 'program'
        LEFT JOIN documents p ON prog_da.related_id = p.id AND p.document_type = 'program'
+       LEFT JOIN project_statuses ps ON ps.project_id = d.id
        WHERE d.workspace_id = $1
          AND d.document_type = 'project'
          AND (d.properties->>'owner_id')::uuid = $2
