@@ -95,7 +95,7 @@ export async function authMiddleware(
 
       next();
       return;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('API token auth error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         success: false,
@@ -225,7 +225,7 @@ export async function authMiddleware(
     req.isSuperAdmin = session.is_super_admin;
 
     next();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Auth middleware error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -302,7 +302,7 @@ export async function workspaceAdminMiddleware(
     }
 
     next();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Workspace admin middleware error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -357,7 +357,7 @@ export async function workspaceAccessMiddleware(
     }
 
     next();
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Workspace access middleware error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,

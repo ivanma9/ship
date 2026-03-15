@@ -15,8 +15,25 @@ const router: RouterType = Router();
 // Inferred project status type
 type InferredProjectStatus = 'active' | 'planned' | 'completed' | 'backlog' | 'archived';
 
+interface ProjectRow {
+  id: string;
+  title: string;
+  properties: Record<string, any> | null;
+  program_id: string | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+  owner_id: string | null;
+  owner_name: string | null;
+  owner_email: string | null;
+  sprint_count: string;
+  issue_count: string;
+  inferred_status: string | null;
+  converted_from_id: string | null;
+}
+
 // Helper to extract project from row with computed ice_score
-function extractProjectFromRow(row: any) {
+function extractProjectFromRow(row: ProjectRow) {
   const props = row.properties || {};
   // ICE values can be null (not yet set) - don't default to 3
   const impact = props.impact !== undefined ? props.impact : null;
@@ -1099,8 +1116,26 @@ const createProjectSprintSchema = z.object({
   confidence: z.number().int().min(0).max(100).optional(),
 });
 
+interface SprintRow {
+  id: string;
+  title: string;
+  properties: Record<string, any> | null;
+  owner_id: string | null;
+  owner_name: string | null;
+  owner_email: string | null;
+  project_id: string | null;
+  project_name: string | null;
+  program_id: string | null;
+  program_name: string | null;
+  program_prefix: string | null;
+  workspace_sprint_start_date: string | null;
+  issue_count: string;
+  completed_count: string;
+  started_count: string;
+}
+
 // Helper to extract sprint from row (matches sprints.ts pattern)
-function extractSprintFromRow(row: any) {
+function extractSprintFromRow(row: SprintRow) {
   const props = row.properties || {};
   return {
     id: row.id,

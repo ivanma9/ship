@@ -238,7 +238,7 @@ export function loadContentFromYjsState(yjsState: Buffer): any | null {
     Y.applyUpdate(doc, yjsState);
     const fragment = doc.getXmlFragment('default');
     return yjsToJson(fragment);
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Failed to load content from Yjs state:', err);
     return null;
   }

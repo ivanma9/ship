@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
+import { AuthenticatedRequest, authHandler } from '../types/express.js';
 import { pool } from '../db/client.js';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
@@ -180,7 +181,7 @@ const weeklyPlanSchema = z.object({
  *       404:
  *         description: Person not found
  */
-router.post('/', authMiddleware, async (req: Request, res: Response) => {
+router.post('/', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   const client = await pool.connect();
   try {
     const parsed = weeklyPlanSchema.safeParse(req.body);
@@ -190,8 +191,8 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     }
 
     const { person_id, project_id, week_number } = parsed.data;
-    const workspaceId = req.workspaceId!;
-    const userId = req.userId!;
+    const workspaceId = req.workspaceId;
+    const userId = req.userId;
 
     // Verify person exists in this workspace
     const personResult = await client.query(
@@ -299,7 +300,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
   } finally {
     client.release();
   }
-});
+}));
 
 /**
  * @swagger
@@ -326,9 +327,9 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
  *       200:
  *         description: List of weekly plans matching query
  */
-router.get('/', authMiddleware, async (req: Request, res: Response) => {
+router.get('/', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const workspaceId = req.workspaceId!;
+    const workspaceId = req.workspaceId;
     const { person_id, project_id, week_number } = req.query;
 
     let query = `
@@ -384,7 +385,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     console.error('Get weekly plans error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 /**
  * @swagger
@@ -405,10 +406,10 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
  *       404:
  *         description: Weekly plan not found
  */
-router.get('/:id/history', authMiddleware, async (req: Request, res: Response) => {
+router.get('/:id/history', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const workspaceId = req.workspaceId!;
+    const workspaceId = req.workspaceId;
 
     // Verify document exists and is a weekly_plan
     const docCheck = await pool.query(
@@ -449,7 +450,7 @@ router.get('/:id/history', authMiddleware, async (req: Request, res: Response) =
     console.error('Get weekly plan history error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 /**
  * @swagger
@@ -470,10 +471,10 @@ router.get('/:id/history', authMiddleware, async (req: Request, res: Response) =
  *       404:
  *         description: Weekly plan not found
  */
-router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.get('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const workspaceId = req.workspaceId!;
+    const workspaceId = req.workspaceId;
 
     const result = await pool.query(
       `SELECT d.id, d.title, d.content, d.properties, d.created_at, d.updated_at,
@@ -510,7 +511,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
     console.error('Get weekly plan error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // ============================================
 // WEEKLY RETROS ROUTES
@@ -557,7 +558,7 @@ const weeklyRetroSchema = z.object({
  */
 export const weeklyRetrosRouter: RouterType = Router();
 
-weeklyRetrosRouter.post('/', authMiddleware, async (req: Request, res: Response) => {
+weeklyRetrosRouter.post('/', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   const client = await pool.connect();
   try {
     const parsed = weeklyRetroSchema.safeParse(req.body);
@@ -567,8 +568,8 @@ weeklyRetrosRouter.post('/', authMiddleware, async (req: Request, res: Response)
     }
 
     const { person_id, project_id, week_number } = parsed.data;
-    const workspaceId = req.workspaceId!;
-    const userId = req.userId!;
+    const workspaceId = req.workspaceId;
+    const userId = req.userId;
 
     // Verify person exists in this workspace
     const personResult = await client.query(
@@ -694,7 +695,7 @@ weeklyRetrosRouter.post('/', authMiddleware, async (req: Request, res: Response)
   } finally {
     client.release();
   }
-});
+}));
 
 /**
  * @swagger
@@ -721,9 +722,9 @@ weeklyRetrosRouter.post('/', authMiddleware, async (req: Request, res: Response)
  *       200:
  *         description: List of weekly retros matching query
  */
-weeklyRetrosRouter.get('/', authMiddleware, async (req: Request, res: Response) => {
+weeklyRetrosRouter.get('/', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const workspaceId = req.workspaceId!;
+    const workspaceId = req.workspaceId;
     const { person_id, project_id, week_number } = req.query;
 
     let query = `
@@ -779,7 +780,7 @@ weeklyRetrosRouter.get('/', authMiddleware, async (req: Request, res: Response) 
     console.error('Get weekly retros error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 /**
  * @swagger
@@ -800,10 +801,10 @@ weeklyRetrosRouter.get('/', authMiddleware, async (req: Request, res: Response) 
  *       404:
  *         description: Weekly retro not found
  */
-weeklyRetrosRouter.get('/:id/history', authMiddleware, async (req: Request, res: Response) => {
+weeklyRetrosRouter.get('/:id/history', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const workspaceId = req.workspaceId!;
+    const workspaceId = req.workspaceId;
 
     // Verify document exists and is a weekly_retro
     const docCheck = await pool.query(
@@ -844,7 +845,7 @@ weeklyRetrosRouter.get('/:id/history', authMiddleware, async (req: Request, res:
     console.error('Get weekly retro history error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 /**
  * @swagger
@@ -865,10 +866,10 @@ weeklyRetrosRouter.get('/:id/history', authMiddleware, async (req: Request, res:
  *       404:
  *         description: Weekly retro not found
  */
-weeklyRetrosRouter.get('/:id', authMiddleware, async (req: Request, res: Response) => {
+weeklyRetrosRouter.get('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const workspaceId = req.workspaceId!;
+    const workspaceId = req.workspaceId;
 
     const result = await pool.query(
       `SELECT d.id, d.title, d.content, d.properties, d.created_at, d.updated_at,
@@ -905,7 +906,7 @@ weeklyRetrosRouter.get('/:id', authMiddleware, async (req: Request, res: Respons
     console.error('Get weekly retro error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 /**
  * @swagger
@@ -925,10 +926,10 @@ weeklyRetrosRouter.get('/:id', authMiddleware, async (req: Request, res: Respons
  *       200:
  *         description: Allocation grid data
  */
-router.get('/project-allocation-grid/:projectId', authMiddleware, async (req: Request, res: Response) => {
+router.get('/project-allocation-grid/:projectId', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { projectId } = req.params;
-    const workspaceId = req.workspaceId!;
+    const workspaceId = req.workspaceId;
 
     // Verify project exists
     const projectResult = await pool.query(
@@ -984,7 +985,7 @@ router.get('/project-allocation-grid/:projectId', authMiddleware, async (req: Re
           allocatedWeeks: new Set(),
         });
       }
-      peopleMap.get(row.person_id)!.allocatedWeeks.add(row.week_number);
+      peopleMap.get(row.person_id)?.allocatedWeeks.add(row.week_number);
     }
 
     // Get all weekly plans for this project (include content to check if "done")
@@ -1160,6 +1161,6 @@ router.get('/project-allocation-grid/:projectId', authMiddleware, async (req: Re
     console.error('Get project allocation grid error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 export default router;

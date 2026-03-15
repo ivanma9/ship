@@ -67,7 +67,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response): Promise<voi
       success: true,
       data: { workspaces, isSuperAdmin },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('List workspaces error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -128,7 +128,7 @@ router.get('/current', authMiddleware, async (req: Request, res: Response): Prom
         },
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Get current workspace error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -222,7 +222,7 @@ router.post('/:id/switch', authMiddleware, async (req: Request, res: Response): 
       success: true,
       data: { workspaceId },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Switch workspace error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -309,7 +309,7 @@ router.get('/:id/members', authMiddleware, workspaceAdminMiddleware, async (req:
       success: true,
       data: { members },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('List members error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -408,7 +408,7 @@ router.post('/:id/members', authMiddleware, workspaceAdminMiddleware, async (req
         },
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Add member error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -499,7 +499,7 @@ router.patch('/:id/members/:userId', authMiddleware, workspaceAdminMiddleware, a
       success: true,
       data: { role },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Update member role error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -596,7 +596,7 @@ router.delete('/:id/members/:userId', authMiddleware, workspaceAdminMiddleware, 
     });
 
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Remove member error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -678,7 +678,7 @@ router.post('/:id/members/:userId/restore', authMiddleware, workspaceAdminMiddle
     });
 
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Restore member error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -719,7 +719,7 @@ router.get('/:id/invites', authMiddleware, workspaceAdminMiddleware, async (req:
       success: true,
       data: { invites },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('List invites error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -952,7 +952,7 @@ router.post('/:id/invites', authMiddleware, workspaceAdminMiddleware, async (req
         },
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Create invite error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -1005,7 +1005,7 @@ router.delete('/:id/invites/:inviteId', authMiddleware, workspaceAdminMiddleware
     });
 
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Revoke invite error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,
@@ -1055,7 +1055,7 @@ router.get('/:id/audit-logs', authMiddleware, workspaceAdminMiddleware, async (r
       success: true,
       data: { logs },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Get audit logs error:', error);
     res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       success: false,

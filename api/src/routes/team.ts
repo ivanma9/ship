@@ -1282,7 +1282,7 @@ router.get('/accountability-grid-v2', authMiddleware, async (req: Request, res: 
         });
       }
       if (row.project_id) {
-        programsMap.get(row.program_id)!.projects.set(row.project_id, {
+        programsMap.get(row.program_id)?.projects.set(row.project_id, {
           id: row.project_id,
           title: row.project_title,
           color: row.project_color || '#6b7280',
@@ -1983,10 +1983,10 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
       };
 
       if (programGroups.has(programId)) {
-        programGroups.get(programId)!.people.push(personData);
+        programGroups.get(programId)?.people.push(personData);
       } else {
         // Program doesn't exist (maybe archived), add to unassigned
-        programGroups.get('unassigned')!.people.push(personData);
+        programGroups.get('unassigned')?.people.push(personData);
       }
     }
 

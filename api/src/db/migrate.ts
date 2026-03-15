@@ -86,7 +86,7 @@ async function migrate() {
         await client.query('COMMIT');
         console.log(`  ✅ ${file} applied`);
         migrationsRun++;
-      } catch (err) {
+      } catch (err: unknown) {
         await client.query('ROLLBACK');
         throw err;
       } finally {
@@ -100,7 +100,7 @@ async function migrate() {
       console.log(`✅ ${migrationsRun} migration(s) applied successfully`);
     }
 
-  } catch (error) {
+  } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     // "already exists" errors from schema.sql are fine
     if (errorMessage.includes('already exists')) {

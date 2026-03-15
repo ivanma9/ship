@@ -35,8 +35,22 @@ const SPRINT_COUNT_JOIN = (workspaceParam: string) => `
     GROUP BY da.related_id
   ) sc ON sc.related_id = d.id`;
 
+interface ProgramRow {
+  id: string;
+  title: string;
+  properties: Record<string, any> | null;
+  archived_at: string | null;
+  created_at: string;
+  updated_at: string;
+  owner_id: string | null;
+  owner_name: string | null;
+  owner_email: string | null;
+  issue_count: string | number;
+  sprint_count: string | number;
+}
+
 // Helper to extract program from row
-function extractProgramFromRow(row: any) {
+function extractProgramFromRow(row: ProgramRow) {
   const props = row.properties || {};
   return {
     id: row.id,

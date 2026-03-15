@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
+import { AuthenticatedRequest, authHandler } from '../types/express.js';
 import { pool } from '../db/client.js';
 import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
@@ -93,11 +94,11 @@ const updateDocumentSchema = z.object({
 });
 
 // List documents
-router.get('/', authMiddleware, async (req: Request, res: Response) => {
+router.get('/', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { type, parent_id } = req.query;
-    const userId = req.userId!;
-    const workspaceId = req.workspaceId!;
+    const userId = req.userId;
+    const workspaceId = req.workspaceId;
 
     // Check if user is admin (admins can see all documents)
     const isAdmin = await isWorkspaceAdmin(userId, workspaceId);
@@ -153,10 +154,10 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     console.error('List documents error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // List converted documents (archived originals that were converted to another type)
-router.get('/converted/list', authMiddleware, async (req: Request, res: Response) => {
+router.get('/converted/list', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = String(req.userId);
     const workspaceId = String(req.workspaceId);
@@ -217,10 +218,10 @@ router.get('/converted/list', authMiddleware, async (req: Request, res: Response
     console.error('List converted documents error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Get single document
-router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.get('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const id = String(req.params.id);
     const userId = String(req.userId);
@@ -360,12 +361,12 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
     console.error('Get document error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Get document content as TipTap JSON
 // This endpoint converts Yjs state to TipTap JSON if content is null
 // Useful for API-based document editing without using the collaborative editor
-router.get('/:id/content', authMiddleware, async (req: Request, res: Response) => {
+router.get('/:id/content', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const id = String(req.params.id);
     const userId = String(req.userId);
@@ -415,12 +416,12 @@ router.get('/:id/content', authMiddleware, async (req: Request, res: Response) =
     console.error('Get document content error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Update document content with TipTap JSON
 // This endpoint updates content and clears yjs_state (forcing regeneration)
 // Useful for API-based document editing without using the collaborative editor
-router.patch('/:id/content', authMiddleware, async (req: Request, res: Response) => {
+router.patch('/:id/content', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const id = String(req.params.id);
     const userId = String(req.userId);
@@ -494,10 +495,10 @@ router.patch('/:id/content', authMiddleware, async (req: Request, res: Response)
     console.error('Update document content error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Create document
-router.post('/', authMiddleware, async (req: Request, res: Response) => {
+router.post('/', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   const client = await pool.connect();
   try {
     const parsed = createDocumentSchema.safeParse(req.body);
@@ -572,7 +573,7 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     // Sprint plans clear the "write sprint plan" action item
     // Documents with outcome property linked to sprints clear the "write retro" action item
     if (document_type === 'weekly_plan' || (properties && 'outcome' in properties)) {
-      broadcastToUser(req.userId!, 'accountability:updated', { documentId: newDoc.id, documentType: document_type });
+      broadcastToUser(req.userId, 'accountability:updated', { documentId: newDoc.id, documentType: document_type });
     }
 
     res.status(201).json(newDoc);
@@ -583,10 +584,10 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
   } finally {
     client.release();
   }
-});
+}));
 
 // Update document
-router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.patch('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   const client = await pool.connect();
   try {
     const id = String(req.params.id);
@@ -1184,10 +1185,10 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
   } finally {
     client.release();
   }
-});
+}));
 
 // Delete document
-router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
+router.delete('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const id = String(req.params.id);
     const userId = String(req.userId);
@@ -1221,7 +1222,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
     console.error('Delete document error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Convert document type (issue <-> project)
 // Uses in-place conversion with snapshots: same ID, state preserved for undo
@@ -1229,7 +1230,7 @@ const convertDocumentSchema = z.object({
   target_type: z.enum(['issue', 'project']),
 });
 
-router.post('/:id/convert', authMiddleware, async (req: Request, res: Response) => {
+router.post('/:id/convert', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   const client = await pool.connect();
   try {
     const id = String(req.params.id);
@@ -1428,10 +1429,10 @@ router.post('/:id/convert', authMiddleware, async (req: Request, res: Response) 
   } finally {
     client.release();
   }
-});
+}));
 
 // POST /documents/:id/undo-conversion - Undo a document conversion using snapshots
-router.post('/:id/undo-conversion', authMiddleware, async (req: Request, res: Response) => {
+router.post('/:id/undo-conversion', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   const id = String(req.params.id);
   const userId = String(req.userId);
   const workspaceId = String(req.workspaceId);
@@ -1595,7 +1596,7 @@ router.post('/:id/undo-conversion', authMiddleware, async (req: Request, res: Re
   } finally {
     client.release();
   }
-});
+}));
 
 export default router;
 
