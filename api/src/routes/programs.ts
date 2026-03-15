@@ -316,8 +316,8 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
               u.name as owner_name, u.email as owner_email
        FROM documents d
        LEFT JOIN users u ON u.id = COALESCE((d.properties->>'owner_id')::uuid, d.created_by)
-       WHERE d.id = $1 AND d.document_type = 'program'`,
-      [id]
+       WHERE d.id = $1 AND d.document_type = 'program' AND d.workspace_id = $2`,
+      [id, workspaceId]
     );
 
     res.json(extractProgramFromRow(result.rows[0]));
@@ -884,16 +884,12 @@ router.post('/:id/merge', authMiddleware, async (req: Request, res: Response) =>
       `SELECT d.id, d.title, d.properties, d.archived_at, d.created_at, d.updated_at,
               COALESCE((d.properties->>'owner_id')::uuid, d.created_by) as owner_id,
               u.name as owner_name, u.email as owner_email,
-              (SELECT COUNT(*) FROM documents i
-               JOIN document_associations da ON da.document_id = i.id AND da.related_id = d.id AND da.relationship_type = 'program'
-               WHERE i.document_type = 'issue') as issue_count,
-              (SELECT COUNT(*) FROM documents s
-               JOIN document_associations da ON da.document_id = s.id AND da.related_id = d.id AND da.relationship_type = 'program'
-               WHERE s.document_type = 'sprint') as sprint_count
+              ${ISSUE_COUNT_JOIN('$2')}
+              ${SPRINT_COUNT_JOIN('$2')}
        FROM documents d
        LEFT JOIN users u ON u.id = COALESCE((d.properties->>'owner_id')::uuid, d.created_by)
-       WHERE d.id = $1 AND d.document_type = 'program'`,
-      [targetId]
+       WHERE d.id = $1 AND d.document_type = 'program' AND d.workspace_id = $2`,
+      [targetId, workspaceId]
     );
 
     res.json(extractProgramFromRow(result.rows[0]));
