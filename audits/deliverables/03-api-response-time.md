@@ -5,6 +5,13 @@
 **After Date:** 2026-03-12
 **Source:** `audits/api-response-time.md`
 
+**How to Reproduce:**
+```bash
+# Pre-requisites: pnpm dev running (API on :3000), DB seeded
+node audits/scripts/api-benchmark.mjs
+# Output: audits/artifacts/api-benchmark-result.json
+```
+
 Response times were measured using ApacheBench (`ab`) and `k6` against a local API (`http://127.0.0.1:3000`) with local PostgreSQL at a seeded data volume of 572 documents, 104 issues, 26 users, and 35 sprints. Benchmarks were run at three concurrency levels (c10, c25, c50). Results below use c50 as the primary comparison tier, consistent with the audit deliverable definition. P50/P95/P99 values are from the `ab` tool unless noted.
 
 ---
