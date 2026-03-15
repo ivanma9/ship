@@ -376,6 +376,9 @@ CREATE INDEX IF NOT EXISTS idx_document_associations_related_id ON document_asso
 CREATE INDEX IF NOT EXISTS idx_document_associations_type ON document_associations(relationship_type);
 CREATE INDEX IF NOT EXISTS idx_document_associations_related_type ON document_associations(related_id, relationship_type);
 CREATE INDEX IF NOT EXISTS idx_document_associations_document_type ON document_associations(document_id, relationship_type);
+-- Covering composite indexes for query optimization (migration 039)
+CREATE INDEX IF NOT EXISTS idx_doc_assoc_doc_type_related ON document_associations(document_id, relationship_type, related_id);
+CREATE INDEX IF NOT EXISTS idx_doc_assoc_related_type_doc ON document_associations(related_id, relationship_type, document_id);
 
 -- Document history indexes
 CREATE INDEX IF NOT EXISTS idx_document_history_document_created ON document_history(document_id, created_at DESC);
