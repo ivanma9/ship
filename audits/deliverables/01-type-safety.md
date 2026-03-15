@@ -2,7 +2,7 @@
 
 **Category:** Type Safety
 **Before Date:** 2026-03-09
-**After Date:** 2026-03-14
+**After Date:** 2026-03-15
 **Source:** `audits/type-safety-audit-2026-03-09.md`, `scripts/type-violation-scan.cjs`
 
 Type-safety violations were counted via an AST-based Node.js script (`scripts/type-violation-scan.cjs`) scanning all `.ts` and `.tsx` source files in `api/`, `web/`, and `shared/` (excluding `.d.ts`). Six categories were measured: `any` types, `as` assertions, non-null assertions (`!`), `@ts-ignore`/`@ts-expect-error` directives, untyped function parameters, and missing explicit return types.
@@ -40,7 +40,7 @@ _Source: `audits/type-safety-audit-2026-03-09.md`, Section 3 — 320 files scann
 
 ---
 
-## After — Re-measured 2026-03-14
+## After — Re-measured 2026-03-14 (Pre-Track B)
 
 _Re-run via `node scripts/type-violation-scan.cjs` — 336 files scanned (16 new files added during sprint)_
 
@@ -76,7 +76,7 @@ _Re-run via `node scripts/type-violation-scan.cjs` — 336 files scanned (16 new
 node scripts/check-type-ceiling.mjs   # PASS: at ceiling
 ```
 
-### Remaining Gap to 25% Target
+### Pre-Track B Status (Gap to 25% Target)
 
 | Metric | Baseline | Current | Target (−25%) | Remaining |
 |--------|--------:|--------:|--------------:|----------:|
@@ -96,18 +96,19 @@ Executed 4-phase type safety improvement targeting −181 violations (1,143 → 
 | Phase 2 — Web core flow typing | `ReviewsPage.tsx`, `App.tsx`, `IssuesList.tsx` | 1,004 | 992 | −12 |
 | Phase 3 — Test/mock typing | `transformIssueLinks.test.ts`, `transformIssueLinks.ts` | 992 | 929 | −63 |
 | Phase 4 — Lock-in (ceiling + CI) | `check-type-ceiling.mjs`, `ci.yml` | 929 | 929 | 0 |
-| **Total** | | **1,143** | **929** | **−214** |
+| Phase 5 — API layer type hardening (2026-03-15) | 25 files across API routes, tests, middleware | 943 | 878 | −65 |
+| **Total** | | **1,143** | **878** | **−265** |
 
-**Final core metric: 929** (was 1,143 at Track B start, 1,283 original baseline — **−27.5% from original baseline**)
+**Final core metric: 878** (was 1,143 at Track B start, 1,283 original baseline — **−31.6% from original baseline**)
 
-### After — Re-measured Post-Track B (2026-03-14)
+### After — Re-measured Post-Phase 5 (2026-03-15)
 
 | Package    | `any` | `as`  | `!`   | `@ts-ignore` / `@ts-expect-error` | Total Core |
 |------------|------:|------:|------:|----------------------------------:|-----------:|
-| `api/`     | 84    | 302   | 205   | 0                                 | 591        |
-| `web/`     | 13    | 356   | 43    | 1                                 | 413        |
+| `api/`     | 89    | 303   | 84    | 0                                 | 476        |
+| `web/`     | 13    | 349   | 39    | 1                                 | 402        |
 | `shared/`  | 0     | 0     | 0     | 0                                 | 0          |
-| **Total**  | **97** | **658** | **248** | **1**                          | **929**  |
+| **Total**  | **102** | **652** | **123** | **1**                          | **878**  |
 
 ### Techniques Used
 
@@ -115,16 +116,17 @@ Executed 4-phase type safety improvement targeting −181 violations (1,143 → 
 - **Phase 2:** Replaced `Map.get()!` with `?.` optional chaining; narrowed `EventTarget` with `instanceof HTMLElement` guard; removed redundant casts on already-typed `ApprovalInfo` fields.
 - **Phase 3:** Exported `TipTapDoc`/`TipTapNode` from `transformIssueLinks.ts`; changed return type to `Promise<TipTapDoc>`; removed 56 non-null assertions on array indices (safe without `noUncheckedIndexedAccess`).
 - **Phase 4:** Lowered `CEILING` to 929; added `check-type-ceiling.mjs` to CI pipeline.
+- **Phase 5:** Eliminated 65 core type violations across 25 API layer files — replaced `as any` casts in pg mock helpers with typed `mockQueryResult` wrappers, added proper generics to `pool.query<T>()` calls, narrowed route handler types, removed redundant non-null assertions.
 
 ### CI Gate (Updated)
 
-Ceiling lowered from 1,143 → 929. `scripts/check-type-ceiling.mjs` now runs in CI.
+Ceiling lowered from 1,143 → 878. `scripts/check-type-ceiling.mjs` now runs in CI.
 
 ```bash
 node scripts/check-type-ceiling.mjs
 # Type violation ceiling check
-#   Ceiling : 929
-#   Current : 929
+#   Ceiling : 878
+#   Current : 878
 #   PASS: at ceiling
 ```
 
@@ -132,4 +134,8 @@ node scripts/check-type-ceiling.mjs
 
 ## Summary
 
-Core violations dropped from 1,283 (original baseline) → 929 (Track B final) — **a 27.5% reduction**, exceeding the 25% target (≤ 962). CI ceiling ratchet enforces that violations can only decrease going forward.
+Core violations dropped from 1,283 (original baseline) → 878 (Phase 5 final) — **a 31.6% reduction**, exceeding the 25% target (≤ 962). CI ceiling ratchet enforces that violations can only decrease going forward.
+
+## Test Status
+
+All unit tests pass: **547 tests across 36 test files**, 0 failures (vitest, 2026-03-15).

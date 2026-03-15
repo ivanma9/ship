@@ -102,7 +102,7 @@ const pendingSaves = new Map<string, NodeJS.Timeout>();
 // All document types (doc, issue, program, sprint) map to the unified documents table
 function parseDocId(docName: string): string {
   const parts = docName.split(':');
-  return parts.length > 1 ? parts[1]! : parts[0]!;
+  return (parts.length > 1 ? parts[1] ?? parts[0] : parts[0]) ?? docName;
 }
 
 // Track last content history log time per document to avoid excessive logging
@@ -174,7 +174,7 @@ async function persistDocument(docName: string, doc: Y.Doc) {
       `UPDATE documents SET yjs_state = $1, content = $2, properties = $3, updated_at = now() WHERE id = $4`,
       [Buffer.from(state), JSON.stringify(content), JSON.stringify(updatedProps), docId]
     );
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Failed to persist document:', err);
   }
 }
@@ -250,7 +250,7 @@ async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
             contentSample: typeof originalContent === 'string' ? originalContent.substring(0, 100) : JSON.stringify(originalContent).substring(0, 100),
           });
         }
-      } catch (parseErr) {
+      } catch (parseErr: unknown) {
         console.error(`[Collaboration] Failed to parse JSON content for ${docName}:`, parseErr);
         // Start with empty document if content is corrupted
       }
@@ -258,7 +258,7 @@ async function getOrCreateDoc(docName: string): Promise<Y.Doc> {
       docLoadSources.set(docName, 'empty');
       console.log(`[Collaboration] No content found for ${docName}, starting with empty document`);
     }
-  } catch (err) {
+  } catch (err: unknown) {
     console.error(`[Collaboration] Failed to load document ${docName}:`, err);
   }
 

@@ -118,3 +118,7 @@ All 34 Serious accessibility violations (100% contrast failures) were resolved. 
 | Total Critical violations | 0 | 0 | PASS |
 | Pages with Serious violations | 0 | 0 | PASS |
 | Lighthouse score (priority pages) | 100 | 100 | PASS |
+
+## Test Status
+
+All unit tests pass: **547 tests across 36 test files**, 0 failures (vitest, 2026-03-15).

@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
+import { AuthenticatedRequest, authHandler } from '../types/express.js';
 import { pool } from '../db/client.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
@@ -13,11 +14,11 @@ const updateLinksSchema = z.object({
 });
 
 // GET /api/documents/:id/backlinks - Get documents that link to this one
-router.get('/:id/backlinks', authMiddleware, async (req: Request, res: Response) => {
+router.get('/:id/backlinks', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.userId!;
-    const workspaceId = req.workspaceId!;
+    const userId = req.userId;
+    const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
     const { isAdmin } = await getVisibilityContext(userId, workspaceId);
@@ -64,14 +65,14 @@ router.get('/:id/backlinks', authMiddleware, async (req: Request, res: Response)
     console.error('Get backlinks error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // POST /api/documents/:id/links - Update links for a document
-router.post('/:id/links', authMiddleware, async (req: Request, res: Response) => {
+router.post('/:id/links', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = req.userId!;
-    const workspaceId = req.workspaceId!;
+    const userId = req.userId;
+    const workspaceId = req.workspaceId;
 
     const parsed = updateLinksSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -149,7 +150,7 @@ router.post('/:id/links', authMiddleware, async (req: Request, res: Response) =>
     console.error('Update links error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 export default router;
 

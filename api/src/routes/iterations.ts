@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
+import { AuthenticatedRequest, authHandler } from '../types/express.js';
 import { pool } from '../db/client.js';
 import { z } from 'zod';
 import { getVisibilityContext, VISIBILITY_FILTER_SQL } from '../middleware/visibility.js';
@@ -23,11 +24,11 @@ const listIterationsSchema = z.object({
 });
 
 // Create iteration entry - POST /api/weeks/:id/iterations
-router.post('/:id/iterations', authMiddleware, async (req: Request, res: Response) => {
+router.post('/:id/iterations', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id: sprintId } = req.params;
-    const userId = req.userId!;
-    const workspaceId = req.workspaceId!;
+    const userId = req.userId;
+    const workspaceId = req.workspaceId;
 
     const parsed = createIterationSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -90,14 +91,14 @@ router.post('/:id/iterations', authMiddleware, async (req: Request, res: Respons
     console.error('Create iteration error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 // Get sprint iterations - GET /api/weeks/:id/iterations
-router.get('/:id/iterations', authMiddleware, async (req: Request, res: Response) => {
+router.get('/:id/iterations', authMiddleware, authHandler(async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id: sprintId } = req.params;
-    const userId = req.userId!;
-    const workspaceId = req.workspaceId!;
+    const userId = req.userId;
+    const workspaceId = req.workspaceId;
 
     // Parse and validate query params
     const queryParsed = listIterationsSchema.safeParse(req.query);
@@ -168,6 +169,6 @@ router.get('/:id/iterations', authMiddleware, async (req: Request, res: Response
     console.error('Get iterations error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
+}));
 
 export default router;

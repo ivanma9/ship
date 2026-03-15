@@ -498,7 +498,7 @@ async function main() {
           },
         ],
       };
-    } catch (error) {
+    } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
       return {
         content: [
@@ -518,7 +518,7 @@ async function main() {
   console.error(`Ship MCP server running on ${CONFIG.url}`);
 }
 
-main().catch((error) => {
+main().catch((error: unknown) => {
   console.error("Failed to start Ship MCP server:", error);
   process.exit(1);
 });

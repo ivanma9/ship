@@ -1251,7 +1251,7 @@ async function seed() {
     console.log('Login credentials:');
     console.log('  Email: dev@ship.local');
     console.log('  Password: admin123');
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('❌ Seed failed:', error);
     process.exit(1);
   } finally {

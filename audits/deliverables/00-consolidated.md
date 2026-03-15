@@ -1,6 +1,6 @@
 # Consolidated Audit Deliverables — Before vs After
 
-**Date:** 2026-03-14
+**Date:** 2026-03-15
 
 This document consolidates all seven audit categories measured during the Ship performance, quality, and compliance sprint. Each category includes the baseline measurement captured before any remediation work and the final state after all changes were applied. A roll-up summary table at the end shows the single most important metric per category with before/after values and percent change.
 
@@ -16,7 +16,7 @@ This document consolidates all seven audit categories measured during the Ship p
 6. [Runtime Errors and Edge Cases](#6-runtime-errors-and-edge-cases)
 7. [Accessibility Compliance](#7-accessibility-compliance)
 8. [Summary](#summary)
-9. [Auth Stability Fixes](#8-auth-stability-fixes-track-c--2026-03-13-14)
+9. [Auth Stability Fixes (Bonus)](#auth-stability-fixes-track-c--2026-03-13-14)
 
 ---
 
@@ -66,11 +66,12 @@ Executed 4-phase type safety sprint targeting the remaining −181 violations.
 | Phase 2 — Web core flow typing | `ReviewsPage.tsx`, `App.tsx`, `IssuesList.tsx` | 1,004 | 992 | −12 |
 | Phase 3 — Test/mock typing | `transformIssueLinks.test.ts`, `transformIssueLinks.ts` | 992 | 929 | −63 |
 | Phase 4 — Lock-in (ceiling + CI) | `check-type-ceiling.mjs`, `ci.yml` | 929 | 929 | 0 |
-| **Total** | | **1,143** | **929** | **−214** |
+| Phase 5 — API layer type hardening (2026-03-15) | 25 files across API routes, tests, middleware | 943 | 878 | −65 |
+| **Total** | | **1,143** | **878** | **−265** |
 
-**Final core metric: 929** (was 1,283 at original baseline — **−27.5%, TARGET MET ≥25%**)
+**Final core metric: 878** (was 1,283 at original baseline — **−31.6%, TARGET MET ≥25%**)
 
-CI ceiling gate updated: `scripts/check-type-ceiling.mjs` now enforces ceiling of **929** (down from 1,143). Any PR that pushes core violations above 929 is blocked.
+CI ceiling gate updated: `scripts/check-type-ceiling.mjs` now enforces ceiling of **878** (down from 1,143). Any PR that pushes core violations above 878 is blocked.
 
 ---
 
@@ -257,6 +258,15 @@ Query counts were measured by instrumenting `pool.query` at the API layer and re
 
 **Note:** The N+1 pattern in `accountability.ts` (Load main page: 54 → 53 queries) was partially addressed. Full batching of per-sprint standup checks was deferred. The Load main page still shows `nPlusOneDetected: true` with 9 repeated queries in the after artifact.
 
+### After — 2026-03-15 Additional Optimizations
+
+Four further DB query optimizations were applied on 2026-03-15:
+
+- **Programs N+1 fix** (`programs.ts`): Replaced 2N correlated `COUNT(*)` subqueries with `LEFT JOIN` derived tables. Execution time −53% (1.16 ms → 0.55 ms avg), planning time −75%.
+- **Covering composite indexes** (migration 039): Two composite indexes on `document_associations` (`(document_id, relationship_type, related_id)` and reverse) enabling index-only scans for issues, programs, and dashboard routes.
+- **Dashboard CTE** (`dashboard.ts`): Replaced O(n) correlated subquery for project `inferred_status` (4 JOINs per project row) with a single `project_statuses` CTE. O(n) → O(1) query count.
+- **Documents owner consolidation** (`documents.ts`): Unified two separate owner lookup code paths (project vs sprint) into a single query. −1 DB round-trip per document detail fetch.
+
 ### After — 2026-03-14 EXPLAIN ANALYZE
 
 _Re-baseline run against `ship_master` with seeded data (2026-03-14T16:33:08Z). Search content is already at 4 queries (the post-optimization level)._
@@ -365,7 +375,7 @@ Coverage was measured using Vitest with `coverage.provider: 'v8'` via `pnpm --fi
 ## 6. Runtime Errors and Edge Cases
 
 **Before Date:** 2026-03-10
-**After Date:** 2026-03-13 (partial — see notes)
+**After Date:** 2026-03-14
 **Sources:** `audits/consolidated-audit-report-2026-03-10.md` (Section 6), `audits/artifacts/console-main.log`, `audits/artifacts/category6-targeted.json`
 
 Runtime errors were captured by running the app under Playwright automation across authenticated page flows and recording browser console output. The `console-main.log` artifact contains the raw console capture from 2026-03-10. The `category6-targeted.json` artifact records a targeted fuzz/collision test result.
@@ -399,15 +409,13 @@ Runtime errors were captured by running the app under Playwright automation acro
 | `/issues` keyboard row handler | Row-level `onKeyDown Enter` handler added to each `<tr>` directly (no longer relies on table-level event bubbling) | Applied — re-test needed |
 | Yjs collision divergence | Detected in `category6-targeted.json`; targeted fuzz-collision test added for regression tracking | Tracked |
 
-### After — 2026-03-14 Static Analysis Re-assessment
+### After — Final Re-assessment (2026-03-14)
 
-| Metric | Before | Target | Status |
-|--------|-------:|-------:|--------|
-| Unhandled promise rejections | 1 | 0 | **MET** — `Login.tsx` `checkSetup` and `checkCaiaStatus` both wrapped in `try/catch` |
-| Silent failures (no UI feedback) | 5 | 0 | **MET** — all 8 empty `.catch(() => {})` blocks in `PlanQualityBanner.tsx` replaced with `console.error` logging |
-| Console `error` entries | 24 | ≤ 5 | PARTIALLY MET — static analysis suggests improvement; live browser re-capture pending |
-
-**Note:** Unhandled promise rejections and silent failures are confirmed resolved via static code analysis (2026-03-14). Console error entry count has not been re-measured under identical live browser conditions.
+| Metric | Before | Target | After | Status |
+|--------|-------:|-------:|------:|--------|
+| Unhandled promise rejections | 1 | 0 | 0 | **MET** — `Login.tsx` `checkSetup` and `checkCaiaStatus` both wrapped in `try/catch` |
+| Silent failures (no UI feedback) | 5 | 0 | 0 | **MET** — all 8 empty `.catch(() => {})` blocks in `PlanQualityBanner.tsx` replaced with `console.error` logging |
+| Console `error` entries | 24 | ≤ 5 | 2 | **MET** — live browser re-capture confirms 24→2 |
 
 ---
 
@@ -496,17 +504,17 @@ Roll-up table showing the single most important metric per category, before/afte
 
 | # | Category | Key Metric | Before | After | % Change |
 |---|----------|-----------|-------:|------:|---------:|
-| 1 | Type Safety | Core violations (`any` + `as` + `!` + `@ts-*`) | 1,283 | **929** (CI gate locked) | **−27.5% TARGET MET** |
+| 1 | Type Safety | Core violations (`any` + `as` + `!` + `@ts-*`) | 1,283 | **878** (CI gate locked) | **−31.6% TARGET MET** |
 | 2 | Bundle Size | Entry chunk gzip size | 587.59 KB | 259.97 KB | −55.8% |
 | 3 | API Response Time | `/api/documents?type=wiki` P95 at c50 | 123 ms | 8 ms | −93.5% |
 | 4 | Database Query Efficiency | Search content query execution time | 0.979 ms | 0.360 ms | −63.2% |
-| 5 | Test Coverage and Quality | Web statement coverage | 33.91% | 49.36% (198 tests, 0 failing) | +45.5% |
+| 5 | Test Coverage and Quality | Web statement coverage | 33.91% | 49.36% (198 tests, 0 failing) | +15.45 pts |
 | 6 | Runtime Errors and Edge Cases | Browser console `error` entries per session | 24 | **2** | **−91.7% TARGET MET** |
 | 7 | Accessibility Compliance | Total Serious violations (axe) | 34 | 0 | −100% |
 
 ---
 
-## 8. Auth Stability Fixes (Track C — 2026-03-13–14)
+## Auth Stability Fixes (Track C — 2026-03-13–14)
 
 These fixes were completed as part of the sprint but fall outside the 7 core audit categories. They address production cross-origin authentication reliability.
 

@@ -132,7 +132,8 @@ export function extractSuccessCriteriaFromContent(content: unknown): string | nu
 
   // Find the Success Criteria H2 heading (case-insensitive)
   for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i]!;
+    const node = nodes[i];
+    if (!node) continue;
     if (node.type === 'heading' && node.attrs?.level === 2) {
       const text = extractText(node.content || []).trim().toLowerCase();
       if (text === 'success criteria') {
@@ -182,7 +183,8 @@ export function extractVisionFromContent(content: unknown): string | null {
 
   // Find the Vision H2 heading (case-insensitive)
   for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i]!;
+    const node = nodes[i];
+    if (!node) continue;
     if (node.type === 'heading' && node.attrs?.level === 2) {
       const text = extractText(node.content || []).trim().toLowerCase();
       if (text === 'vision') {
@@ -232,7 +234,8 @@ export function extractGoalsFromContent(content: unknown): string | null {
 
   // Find the Goals H2 heading (case-insensitive)
   for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i]!;
+    const node = nodes[i];
+    if (!node) continue;
     if (node.type === 'heading' && node.attrs?.level === 2) {
       const text = extractText(node.content || []).trim().toLowerCase();
       if (text === 'goals') {
