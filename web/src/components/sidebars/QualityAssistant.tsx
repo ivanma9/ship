@@ -164,6 +164,7 @@ export function PlanQualityAssistant({
   const [analysis, setAnalysis] = useState<PlanAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [aiKeyMissing, setAiKeyMissing] = useState(false);
   const lastContentRef = useRef<string>('');
   const pollRef = useRef<ReturnType<typeof setInterval>>();
 
@@ -195,7 +196,10 @@ export function PlanQualityAssistant({
       setLoading(true);
       const res = await quietPost('/api/ai/analyze-plan', { content });
       const data = await res.json();
-      if (!isError(data)) {
+      if (isError(data) && data.error === 'ai_unavailable') {
+        setAiKeyMissing(true);
+      } else if (!isError(data)) {
+        setAiKeyMissing(false);
         setAnalysis(data);
       }
     } catch { /* keep previous analysis */ }
@@ -221,6 +225,17 @@ export function PlanQualityAssistant({
   // Don't render if AI is unavailable
   if (aiAvailable === false) return null;
   if (aiAvailable === null) return null; // Still checking
+
+  if (aiKeyMissing) {
+    return (
+      <div className="space-y-3">
+        <label className="text-xs font-medium text-muted">AI Quality Check</label>
+        <div className="rounded border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
+          <p className="text-xs text-yellow-400">Please enter an API key to use AI functionality.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -295,6 +310,7 @@ export function RetroQualityAssistant({
   const [analysis, setAnalysis] = useState<RetroAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [aiKeyMissing, setAiKeyMissing] = useState(false);
   const lastContentRef = useRef<string>('');
   const pollRef = useRef<ReturnType<typeof setInterval>>();
 
@@ -326,7 +342,10 @@ export function RetroQualityAssistant({
       setLoading(true);
       const res = await quietPost('/api/ai/analyze-retro', { retro_content: content, plan_content: planContent });
       const data = await res.json();
-      if (!isError(data)) {
+      if (isError(data) && data.error === 'ai_unavailable') {
+        setAiKeyMissing(true);
+      } else if (!isError(data)) {
+        setAiKeyMissing(false);
         setAnalysis(data);
       }
     } catch { /* keep previous analysis */ }
@@ -349,6 +368,17 @@ export function RetroQualityAssistant({
   // Don't render if AI is unavailable
   if (aiAvailable === false) return null;
   if (aiAvailable === null) return null;
+
+  if (aiKeyMissing) {
+    return (
+      <div className="space-y-3">
+        <label className="text-xs font-medium text-muted">AI Quality Check</label>
+        <div className="rounded border border-yellow-500/30 bg-yellow-500/5 px-3 py-2">
+          <p className="text-xs text-yellow-400">Please enter an API key to use AI functionality.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">

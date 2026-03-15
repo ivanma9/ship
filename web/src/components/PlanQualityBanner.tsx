@@ -108,6 +108,7 @@ export function PlanQualityBanner({
   const [analysis, setAnalysisRaw] = useState<PlanAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [aiKeyMissing, setAiKeyMissing] = useState(false);
   const lastContentRef = useRef<string>('');
   const requestIdRef = useRef(0);
   const persistedHashRef = useRef<string | null>(null);
@@ -190,7 +191,10 @@ export function PlanQualityBanner({
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (thisRequestId !== requestIdRef.current) return;
-        if (data && !data.error) {
+        if (data?.error === 'ai_unavailable') {
+          setAiKeyMissing(true);
+        } else if (data && !data.error) {
+          setAiKeyMissing(false);
           setAnalysis(data);
           persistAnalysis(data);
         }
@@ -225,6 +229,21 @@ export function PlanQualityBanner({
   }, [aiAvailable, documentId, analysis, runAnalysis]);
 
   if (aiAvailable === false) return null;
+
+  if (aiKeyMissing) {
+    return (
+      <div className="mb-4 pl-8">
+        <div className="w-full rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-yellow-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 9v2m0 4h.01M12 3l9.5 16.5H2.5L12 3z" />
+            </svg>
+            <span className="text-sm text-yellow-400">Please enter an API key to use AI functionality.</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Skeleton / waiting state — show before first analysis
   if (!analysis && !loading) {
@@ -319,6 +338,7 @@ export function RetroQualityBanner({
   const [analysis, setAnalysisRaw] = useState<RetroAnalysis | null>(null);
   const [loading, setLoading] = useState(false);
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+  const [aiKeyMissing, setAiKeyMissing] = useState(false);
   const lastContentRef = useRef<string>('');
   const requestIdRef = useRef(0);
   const persistedHashRef = useRef<string | null>(null);
@@ -434,7 +454,10 @@ export function RetroQualityBanner({
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (thisRequestId !== requestIdRef.current) return;
-        if (data && !data.error) {
+        if (data?.error === 'ai_unavailable') {
+          setAiKeyMissing(true);
+        } else if (data && !data.error) {
+          setAiKeyMissing(false);
           setAnalysis(data);
           persistAnalysis(data);
         }
@@ -469,6 +492,21 @@ export function RetroQualityBanner({
   }, [aiAvailable, documentId, analysis, planContent, runAnalysis]);
 
   if (aiAvailable === false) return null;
+
+  if (aiKeyMissing) {
+    return (
+      <div className="mb-4 pl-8">
+        <div className="w-full rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-yellow-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 9v2m0 4h.01M12 3l9.5 16.5H2.5L12 3z" />
+            </svg>
+            <span className="text-sm text-yellow-400">Please enter an API key to use AI functionality.</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!analysis && !loading) {
     return (
