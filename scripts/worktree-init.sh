@@ -47,7 +47,10 @@ cat > web/.env.local << EOF
 # Worktree: $WORKTREE_NAME
 # Branch: $BRANCH_NAME
 
-VITE_API_URL=http://localhost:$API_PORT
+# VITE_API_URL intentionally left empty so the app uses relative /api URLs
+# and the Vite proxy routes correctly. Setting an absolute URL here breaks
+# E2E tests because it gets baked into the build and bypasses the proxy.
+VITE_API_URL=
 VITE_PORT=$WEB_PORT
 EOF
 
