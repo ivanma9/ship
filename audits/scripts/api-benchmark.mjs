@@ -7,6 +7,15 @@
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 
+// Locate ab binary (macOS: /usr/sbin/ab, Linux: /usr/bin/ab)
+const AB_PATH = process.env.AB_PATH ||
+  (() => {
+    for (const p of ['/usr/sbin/ab', '/usr/bin/ab']) {
+      try { fs.accessSync(p, fs.constants.X_OK); return p; } catch {}
+    }
+    throw new Error('ApacheBench (ab) not found. Install apache2-utils or set AB_PATH env var.');
+  })();
+
 const API = process.env.API_URL || 'http://127.0.0.1:3000';
 const EMAIL = 'dev@ship.local';
 const PASSWORD = 'admin123';
@@ -74,7 +83,7 @@ function getCookieHeader() {
 
 function runAb(path, c, n) {
   const cookieHeader = getCookieHeader();
-  const result = spawnSync('/usr/sbin/ab', [
+  const result = spawnSync(AB_PATH, [
     '-n', String(n),
     '-c', String(c),
     '-H', `Cookie: ${cookieHeader}`,
