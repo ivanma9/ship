@@ -12,20 +12,26 @@ const router: RouterType = Router();
 const ISSUE_COUNT_JOIN = (workspaceParam: string) => `
   LEFT JOIN (
     SELECT da.related_id, COUNT(*) as cnt
-    FROM documents i
-    JOIN document_associations da ON da.document_id = i.id AND da.relationship_type = 'program'
-    WHERE i.document_type = 'issue'
+    FROM document_associations da
+    JOIN documents i ON i.id = da.document_id
+    WHERE da.relationship_type = 'program'
+      AND i.document_type = 'issue'
       AND i.workspace_id = ${workspaceParam}
+      AND i.archived_at IS NULL
+      AND i.deleted_at IS NULL
     GROUP BY da.related_id
   ) ic ON ic.related_id = d.id`;
 
 const SPRINT_COUNT_JOIN = (workspaceParam: string) => `
   LEFT JOIN (
     SELECT da.related_id, COUNT(*) as cnt
-    FROM documents s
-    JOIN document_associations da ON da.document_id = s.id AND da.relationship_type = 'program'
-    WHERE s.document_type = 'sprint'
+    FROM document_associations da
+    JOIN documents s ON s.id = da.document_id
+    WHERE da.relationship_type = 'program'
+      AND s.document_type = 'sprint'
       AND s.workspace_id = ${workspaceParam}
+      AND s.archived_at IS NULL
+      AND s.deleted_at IS NULL
     GROUP BY da.related_id
   ) sc ON sc.related_id = d.id`;
 
