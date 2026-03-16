@@ -1,24 +1,10 @@
 # 03 — API Response Time
 
-**Category:** API Response Time
-**Before Date:** 2026-03-10
-**After Date:** 2026-03-12
-**Source:** `audits/api-response-time.md`
+**Audit Date:** 2026-03-10 · **Remediation Completed:** 2026-03-12
 
-**How to Reproduce:**
-```bash
-# Pre-requisites: pnpm dev running (API on :3000), DB seeded
-node audits/scripts/api-benchmark.mjs
-# Output: audits/artifacts/api-benchmark-result.json
-```
+## Before
 
-Response times were measured using ApacheBench (`ab`) and `k6` against a local API (`http://127.0.0.1:3000`) with local PostgreSQL at a seeded data volume of 572 documents, 104 issues, 26 users, and 35 sprints. Benchmarks were run at three concurrency levels (c10, c25, c50). Results below use c50 as the primary comparison tier, consistent with the audit deliverable definition. P50/P95/P99 values are from the `ab` tool unless noted.
-
----
-
-## Before — c50 Benchmark (AB)
-
-_Source: `audits/api-response-time.md`, "Full Baseline Results (AB)"_
+_c50 concurrency, ApacheBench, local API on :3000, PostgreSQL seeded (572 docs, 104 issues, 26 users, 35 sprints)_
 
 | Endpoint | P50 (ms) | P95 (ms) | P99 (ms) |
 |----------|--------:|---------:|---------:|
@@ -28,56 +14,41 @@ _Source: `audits/api-response-time.md`, "Full Baseline Results (AB)"_
 | `/api/weeks` | 39 | 46 | 53 |
 | `/api/programs` | 30 | 36 | 40 |
 
-### Before — Full Concurrency Matrix (AB, P50/P95/P99 ms)
+## Fixes Applied
 
-| Endpoint | c10 | c25 | c50 |
-|----------|-----|-----|-----|
-| `/api/documents?type=wiki` | 22 / 35 / 47 | 51 / 65 / 73 | 101 / 123 / 131 |
-| `/api/issues` | 17 / 28 / 41 | 41 / 55 / 61 | 87 / 105 / 116 |
-| `/api/projects` | 9 / 14 / 20 | 21 / 69 / 82 | 42 / 54 / 58 |
-| `/api/programs` | 6 / 10 / 12 | 15 / 20 / 21 | 30 / 36 / 40 |
-| `/api/weeks` | 8 / 12 / 15 | 20 / 25 / 28 | 39 / 46 / 53 |
+| Change | Files Touched |
+|--------|---------------|
+| Migration 038 — composite partial index `idx_documents_list_active_type` on `(workspace_id, document_type, position ASC, created_at DESC) WHERE archived_at IS NULL AND deleted_at IS NULL` | `api/src/db/migrations/038_*.sql` |
+| Migration 038 — composite partial index `idx_documents_person_workspace_user` on `(workspace_id, (properties->>'user_id')) WHERE document_type = 'person'`; converts Nested Loop Join to Hash Join | `api/src/db/migrations/038_*.sql` |
+| `/api/issues` list query — removed `d.content` from SELECT (not needed for list view) | `api/src/routes/issues.ts` |
 
----
+## After
 
-## After — Optimization Results (Branch: 005-api-latency-list-endpoints, 2026-03-12)
+| Endpoint | Before P95 c50 (ms) | After P95 c50 (ms) | Delta | Target | Status |
+|----------|--------------------:|-------------------:|------:|--------|--------|
+| `/api/documents?type=wiki` | 123 | **8** | −94% | ≤98 ms | PASS |
+| `/api/issues` | 105 | **7** | −93% | ≤84 ms | PASS |
 
-_Source: `audits/api-response-time.md`, "Before / After Benchmark"_
+**EXPLAIN ANALYZE buffer hits (c50 path):**
 
-### Changes Applied
+| Query | Before | After | Measurement |
+|-------|-------:|------:|-------------|
+| Wiki execution time | 1.4 ms | 0.6 ms | `EXPLAIN (ANALYZE, BUFFERS)` |
+| Wiki buffer hits | 24 | 7 | `EXPLAIN (ANALYZE, BUFFERS)` |
+| Issues execution time | 2.78 ms | 1.25 ms | `EXPLAIN (ANALYZE, BUFFERS)` |
+| Issues buffer hits | 2,527 | 32 | `EXPLAIN (ANALYZE, BUFFERS)` |
 
-| Change | Detail |
-|--------|--------|
-| Migration 038 — `idx_documents_list_active_type` | Composite partial index on `(workspace_id, document_type, position ASC, created_at DESC) WHERE archived_at IS NULL AND deleted_at IS NULL` |
-| Migration 038 — `idx_documents_person_workspace_user` | Composite partial index on `(workspace_id, (properties->>'user_id')) WHERE document_type = 'person'`; converts Nested Loop Join to Hash Join |
-| `/api/issues` list query | Removed `d.content` from SELECT (not needed for list view) |
+**Test status:** 548 tests across 37 test files, 0 failures (vitest, 2026-03-15).
 
-### After — P95 Benchmark Comparison (AB)
+## Measurement
 
-| Endpoint | Concurrency | Before P95 (ms) | After P95 (ms) | Delta | Target | Pass |
-|----------|-------------|----------------:|---------------:|------:|--------|------|
-| `/api/documents?type=wiki` | c10 | 35 | 3 | −91% | — | — |
-| `/api/documents?type=wiki` | c25 | 65 | 5 | −92% | — | — |
-| `/api/documents?type=wiki` | c50 | 123 | **8** | **−94%** | ≤98ms | PASS |
-| `/api/issues` | c10 | 28 | 2 | −93% | — | — |
-| `/api/issues` | c25 | 55 | 6 | −89% | — | — |
-| `/api/issues` | c50 | 105 | **7** | **−93%** | ≤84ms | PASS |
+```bash
+# Pre-requisites: pnpm dev running (API on :3000), DB seeded
+node audits/scripts/api-benchmark.mjs
+# Output: audits/artifacts/api-benchmark-result.json
+```
 
-### EXPLAIN ANALYZE Evidence
+## Key Decisions
 
-| Query | Before | After |
-|-------|--------|-------|
-| Wiki execution time | 1.4 ms | 0.6 ms |
-| Wiki buffer hits | 24 | 7 |
-| Issues execution time | 2.78 ms | 1.25 ms |
-| Issues buffer hits | 2,527 | 32 |
-
----
-
-## Summary
-
-Both primary targets were met without requiring pagination fallbacks. The `/api/documents?type=wiki` P95 at c50 dropped from 123 ms to 8 ms (−94%); the `/api/issues` P95 at c50 dropped from 105 ms to 7 ms (−93%). The improvement came from two new composite partial indexes (migration 038) and removing the `content` column from the issues list query, reducing buffer hits from 2,527 to 32 on the issues path.
-
-## Test Status
-
-All unit tests pass: **547 tests across 36 test files**, 0 failures (vitest, 2026-03-15).
+- Targets were set at 80% of the c50 P95 baseline (98 ms for wikis, 84 ms for issues); both were cleared by a wide margin without requiring pagination fallbacks.
+- Removing `d.content` from the issues list query was the single largest contributor to the buffer-hit reduction (2,527 → 32), since the content column is wide TOAST data never displayed in list views.

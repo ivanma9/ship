@@ -1,0 +1,16 @@
+{
+  "reconnectRecovery": "Success",
+  "redirectChurnCount": 0,
+  "abortedRequestsDuringReconnect": 2,
+  "sessionExpiredRedirects": 0,
+  "consoleErrorsDuringReconnect": 4,
+  "postReconnectEditsPreserved": true,
+  "offlineEditsPreserved": true,
+  "notes": [
+    "Went offline",
+    "Came back online",
+    "Session expired redirects: 0",
+    "Aborted requests during reconnect: 2",
+    "Console errors during reconnect: 4"
+  ]
+}
