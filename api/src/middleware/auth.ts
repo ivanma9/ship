@@ -206,16 +206,17 @@ export async function authMiddleware(
       membershipRole = membershipResult.rows[0].role;
     }
 
-    // Update last activity
-    await pool.query(
-      'UPDATE sessions SET last_activity = $1 WHERE id = $2',
-      [now, sessionId]
-    );
-
-    // Refresh cookie with sliding expiration (throttled to avoid overhead)
-    // Only refresh if more than 60 seconds since last activity
-    const COOKIE_REFRESH_THRESHOLD_MS = 60 * 1000;
-    if (inactivityMs > COOKIE_REFRESH_THRESHOLD_MS) {
+    // Throttle last_activity update and cookie refresh to once per 60 seconds.
+    // The inactivity timeout check above uses the in-memory session value, so
+    // skipping the write on rapid sequential requests has no security impact —
+    // the 15-minute window is measured from the last persisted write which is
+    // at most 60 seconds stale.
+    const ACTIVITY_UPDATE_THRESHOLD_MS = 60 * 1000;
+    if (inactivityMs > ACTIVITY_UPDATE_THRESHOLD_MS) {
+      await pool.query(
+        'UPDATE sessions SET last_activity = $1 WHERE id = $2',
+        [now, sessionId]
+      );
       res.cookie('session_id', sessionId, {
         ...sessionCookieOptions(),
         maxAge: SESSION_TIMEOUT_MS,
