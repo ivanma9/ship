@@ -147,7 +147,7 @@ router.get('/', authMiddleware, authHandler(async (req: AuthenticatedRequest, re
     const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     let query = `
       SELECT d.id, d.title, d.properties, d.ticket_number,
@@ -378,7 +378,7 @@ router.get('/by-ticket/:number', authMiddleware, authHandler(async (req: Authent
     const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     const result = await pool.query(
       `SELECT d.id, d.title, d.properties, d.ticket_number,
@@ -446,7 +446,7 @@ router.get('/:id/children', authMiddleware, authHandler(async (req: Authenticate
     const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify parent issue exists and user can access it
     const parentCheck = await pool.query(
@@ -524,7 +524,7 @@ router.get('/:id', authMiddleware, authHandler(async (req: AuthenticatedRequest,
     const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     const result = await pool.query(
       `SELECT d.id, d.title, d.properties, d.ticket_number,
@@ -713,7 +713,7 @@ router.patch('/:id', authMiddleware, authHandler(async (req: AuthenticatedReques
     }
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Get full existing issue for history tracking (with visibility check)
     const existing = await client.query(
@@ -1044,7 +1044,7 @@ router.get('/:id/history', authMiddleware, authHandler(async (req: Authenticated
     const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify issue exists and user can access it
     const issueCheck = await pool.query(
@@ -1112,7 +1112,7 @@ router.post('/:id/history', authMiddleware, authHandler(async (req: Authenticate
     }
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify issue exists and user can access it
     const issueCheck = await pool.query(
@@ -1169,7 +1169,7 @@ router.post('/bulk', authMiddleware, authHandler(async (req: AuthenticatedReques
     const workspaceId = req.workspaceId;
 
     // Get visibility context
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     await client.query('BEGIN');
 
@@ -1365,7 +1365,7 @@ router.delete('/:id', authMiddleware, authHandler(async (req: AuthenticatedReque
     const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // First verify user can access the issue and check if system-generated
     const accessCheck = await pool.query(
@@ -1412,7 +1412,7 @@ router.post('/:id/accept', authMiddleware, authHandler(async (req: Authenticated
     const workspaceId = req.workspaceId;
 
     // Get visibility context
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Get the issue
     const existing = await pool.query(
@@ -1484,7 +1484,7 @@ router.post('/:id/iterations', authMiddleware, authHandler(async (req: Authentic
     }
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify issue exists and user can access it
     const issueCheck = await pool.query(
@@ -1550,7 +1550,7 @@ router.get('/:id/iterations', authMiddleware, authHandler(async (req: Authentica
     const queryParams = queryParsed.success ? queryParsed.data : {};
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify issue exists and user can access it
     const issueCheck = await pool.query(
@@ -1624,7 +1624,7 @@ router.post('/:id/reject', authMiddleware, authHandler(async (req: Authenticated
     const { reason } = parsed.data;
 
     // Get visibility context
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Get the issue
     const existing = await pool.query(

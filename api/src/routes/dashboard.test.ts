@@ -35,13 +35,13 @@ describe('Dashboard API', () => {
       .mockResolvedValueOnce({ rows: [{ id: 'person-123', title: 'Test Person' }] } as any)
       // Workspace sprint config
       .mockResolvedValueOnce({ rows: [{ sprint_start_date: '2026-01-01' }] } as any)
-      // Weekly plan query
-      .mockResolvedValueOnce({ rows: [] } as any)
-      // Weekly retro query
+      // Merged plan+retro query (plan, retro, and previous retro combined)
       .mockResolvedValueOnce({
         rows: [{
           id: 'retro-123',
           title: 'Week 13 Retro',
+          document_type: 'weekly_retro',
+          week_number: 13,
           properties: { submitted_at: null },
           content: {
             type: 'doc',
@@ -86,14 +86,12 @@ describe('Dashboard API', () => {
           },
         }],
       } as any)
-      // Previous retro query
-      .mockResolvedValueOnce({ rows: [] } as any)
       // Standups query
       .mockResolvedValueOnce({ rows: [] } as any)
       // Allocations query
       .mockResolvedValueOnce({ rows: [] } as any);
 
-    const res = await request(app).get('/api/dashboard/my-week');
+    const res = await request(app).get('/api/dashboard/my-week?week_number=13');
 
     expect(res.status).toBe(200);
     expect(res.body.retro).toBeTruthy();

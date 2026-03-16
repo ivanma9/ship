@@ -19,6 +19,14 @@ import { hasContent } from '../utils/document-content.js';
 import { getAllocations } from '../utils/allocation.js';
 import type { AccountabilityType } from '@ship/shared';
 
+type WorkspaceContext = {
+  workspaceStartDate: Date;
+  sprintDuration: number;
+  currentSprintNumber: number;
+  todayStr: string;
+  today: Date;
+};
+
 type SprintProperties = {
   sprint_number?: number;
   status?: string;
@@ -123,7 +131,7 @@ export async function checkMissingAccountability(
        AND (properties->>'user_id')::uuid = $2`,
     [workspaceId, userId]
   );
-  const personId = personResult.rows[0]?.id || null;
+  const personId = personResult.rows[0]?.id ?? null;
 
   // Parse workspace start date
   let workspaceStartDate: Date;
@@ -138,36 +146,42 @@ export async function checkMissingAccountability(
   // Calculate today and current sprint
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = today.toISOString().split('T')[0] ?? '';
   const daysSinceStart = Math.floor((today.getTime() - workspaceStartDate.getTime()) / (1000 * 60 * 60 * 24));
   const currentSprintNumber = Math.floor(daysSinceStart / sprintDuration) + 1;
 
+  const ctx: WorkspaceContext = {
+    workspaceStartDate,
+    sprintDuration,
+    currentSprintNumber,
+    todayStr,
+    today,
+  };
+
   // Check for missing standups (current sprint, business days only)
-  if (todayStr) {
-    const standupItems = await checkMissingStandups(userId, workspaceId, currentSprintNumber, todayStr);
-    items.push(...standupItems);
-  }
+  const standupItems = await checkMissingStandups(userId, workspaceId, ctx);
+  items.push(...standupItems);
 
   // Check sprint accountability: started status and issues
-  if (todayStr) {
-    const sprintItems = await checkSprintAccountability(
-      userId, workspaceId, workspaceStartDate, sprintDuration, today, personId
-    );
-    items.push(...sprintItems);
-  }
+  const sprintItems = await checkSprintAccountability(userId, workspaceId, ctx, personId);
+  items.push(...sprintItems);
+
+  // Check for missing sprint reviews (completed sprints without review)
+  const sprintReviewItems = await checkMissingSprintReviews(userId, workspaceId, ctx);
+  items.push(...sprintReviewItems);
 
   // Check for per-person weekly_plan and weekly_retro (based on allocations)
   // Check both current sprint AND next sprint, since plans become due 2 days before
   // the sprint starts (Saturday before a Monday-start week).
-  if (personId && todayStr) {
+  if (personId) {
     const weeklyPersonItems = await checkWeeklyPersonAccountability(
-      userId, workspaceId, personId, workspaceStartDate, sprintDuration, currentSprintNumber, todayStr
+      userId, workspaceId, personId, ctx, currentSprintNumber
     );
     items.push(...weeklyPersonItems);
 
     // Also check next sprint - plan may be due before the sprint starts
     const nextSprintItems = await checkWeeklyPersonAccountability(
-      userId, workspaceId, personId, workspaceStartDate, sprintDuration, currentSprintNumber + 1, todayStr
+      userId, workspaceId, personId, ctx, currentSprintNumber + 1
     );
     items.push(...nextSprintItems);
   }
@@ -192,9 +206,9 @@ export async function checkMissingAccountability(
 async function checkMissingStandups(
   userId: string,
   workspaceId: string,
-  currentSprintNumber: number,
-  todayStr: string
+  ctx: WorkspaceContext
 ): Promise<MissingAccountabilityItem[]> {
+  const { currentSprintNumber, todayStr } = ctx;
   const items: MissingAccountabilityItem[] = [];
 
   // Only check on business days
@@ -289,11 +303,10 @@ async function checkMissingStandups(
 async function checkSprintAccountability(
   userId: string,
   workspaceId: string,
-  workspaceStartDate: Date,
-  sprintDuration: number,
-  today: Date,
+  ctx: WorkspaceContext,
   personId: string | null
 ): Promise<MissingAccountabilityItem[]> {
+  const { workspaceStartDate, sprintDuration, today } = ctx;
   const items: MissingAccountabilityItem[] = [];
 
   // Find sprints where user is owner (accountable) and sprint has started
@@ -399,11 +412,10 @@ async function checkWeeklyPersonAccountability(
   userId: string,
   workspaceId: string,
   personId: string,
-  workspaceStartDate: Date,
-  sprintDuration: number,
-  sprintNumber: number,
-  todayStr: string
+  ctx: WorkspaceContext,
+  sprintNumber: number
 ): Promise<MissingAccountabilityItem[]> {
+  const { workspaceStartDate, sprintDuration, todayStr } = ctx;
   const items: MissingAccountabilityItem[] = [];
 
   // Calculate sprint dates
@@ -517,11 +529,9 @@ async function checkWeeklyPersonAccountability(
 async function checkMissingSprintReviews(
   userId: string,
   workspaceId: string,
-  workspaceStartDate: Date,
-  sprintDuration: number,
-  today: Date,
-  todayStr: string
+  ctx: WorkspaceContext
 ): Promise<MissingAccountabilityItem[]> {
+  const { workspaceStartDate, sprintDuration, today, todayStr } = ctx;
   const items: MissingAccountabilityItem[] = [];
 
   // Find past sprints where user is owner without review

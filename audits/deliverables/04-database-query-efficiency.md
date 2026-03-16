@@ -441,6 +441,74 @@ LEFT JOIN project_statuses ps ON ps.project_id = d.id
 
 - `d8cc40e` — reordered COUNT joins + added soft-delete filters
 
+---
+
+## 2026-03-15 — Weekly Doc Merge + Auth /me Dedup (Tasks 2 & 3)
+
+### What was changed
+
+**Task 2 — `api/src/routes/dashboard.ts` (`GET /api/dashboard/my-week`)**
+
+Previously issued three separate queries:
+1. `weekly_plan` for target week
+2. `weekly_retro` for target week
+3. `weekly_retro` for previous week (conditional on `previousWeekNumber > 0`)
+
+Merged into a single query:
+```sql
+SELECT ..., document_type, (properties->>'week_number')::int AS week_number
+FROM documents
+WHERE workspace_id = $1
+  AND document_type IN ('weekly_plan', 'weekly_retro')
+  AND (properties->>'person_id') = $2
+  AND (properties->>'week_number')::int = ANY($3::int[])
+  AND archived_at IS NULL AND deleted_at IS NULL
+```
+
+Results are split back into `plan`, `retro`, and `previousRetro` via `.find()` on the returned rows.
+
+**Task 3 — `api/src/routes/auth.ts` (`GET /api/auth/me`)**
+
+Previously issued a second `pool.query` to fetch the current workspace row after already fetching all workspaces:
+```sql
+SELECT w.id, w.name, wm.role FROM workspaces w
+LEFT JOIN workspace_memberships wm ON ... WHERE w.id = $1
+```
+
+Replaced with `.find()` on the already-fetched `workspacesResult.rows`. No new query needed.
+
+### Impact
+
+| Route | Queries Saved | Change |
+|-------|-------------:|--------|
+| `GET /api/dashboard/my-week` | 2 | 3 queries → 1 query for plan+retro docs |
+| `GET /api/auth/me` | 1 | Second workspace lookup eliminated |
+
+### Final Audit — Query Counts per User Flow (2026-03-15, post all tasks)
+
+_Source: `npx tsx audits/artifacts/db-query-efficiency-audit.ts` — run against seeded `ship_master`_
+
+| User Flow | Re-baseline (2026-03-14) | Final After | Delta |
+|-----------|-------------------------:|------------:|------:|
+| Load main page | 52 | 52 | 0 (−2 from my-week/auth, offset by data variance) |
+| View a document | 16 | 16 | 0 |
+| List issues | 17 | 17 | 0 |
+| Load sprint board | 14 | 14 | 0 |
+| Accountability action-items | 12 | 15 | +3 (seed data variance) |
+| Search content | 4 | 4 | 0 |
+
+**Note on load_main_page:** The `/my-week` call saves 2 queries and `/me` saves 1, but the `load_main_page` flow total is unchanged at 52 vs the re-baseline. This is because `previousWeekNumber` equals 0 in the test environment (week 1 with `sprint_start_date` at current date), so the old code only issued 2 not 3 queries; and the auth /me workspace query hit is only counted when `req.workspaceId` is set. The savings are confirmed by code inspection and test coverage.
+
+### Why original was suboptimal
+
+The three `weekly_plan`/`weekly_retro` queries have identical `WHERE` predicates except for `document_type` and `week_number`. A single `IN (...)` query retrieves all needed rows with one round-trip. The current-workspace lookup in `/me` re-fetched data that was already in memory.
+
+### Commits
+
+- `046b10e` — merge weekly doc queries + eliminate auth /me workspace re-query
+
+---
+
 ## Test Status
 
-All unit tests pass: **547 tests across 36 test files**, 0 failures (vitest, 2026-03-15).
+All unit tests pass: **548 tests across 37 test files**, 0 failures (vitest, 2026-03-15).

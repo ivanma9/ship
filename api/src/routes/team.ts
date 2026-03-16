@@ -18,7 +18,7 @@ router.get('/grid', authMiddleware, async (req: Request, res: Response) => {
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Parse includeArchived query param
     const includeArchived = req.query.includeArchived === 'true';
@@ -204,7 +204,7 @@ router.get('/projects', authMiddleware, async (req: Request, res: Response) => {
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Get all projects with their parent program info
     // Projects without a program will have null programId
@@ -242,7 +242,7 @@ router.get('/programs', authMiddleware, async (req: Request, res: Response) => {
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     const result = await pool.query(
       `SELECT id, title as name, properties->>'emoji' as emoji, properties->>'color' as color
@@ -269,7 +269,7 @@ router.get('/assignments', authMiddleware, async (req: Request, res: Response) =
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // First, get explicit sprint document assignments (assignee_ids array + project_id in properties)
     // Program is resolved via: project -> program (preferred), or sprint -> program (fallback for legacy programId assignments)
@@ -652,7 +652,7 @@ router.delete('/assign', authMiddleware, async (req: Request, res: Response) => 
     const { personId, userId, sprintNumber } = req.body;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(currentUserId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(currentUserId, workspaceId, req.isAdmin);
 
     const ownerId = personId || userId;
     if (!ownerId || !sprintNumber) {
@@ -734,7 +734,7 @@ router.get('/people', authMiddleware, async (req: Request, res: Response) => {
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Parse includeArchived query param
     const includeArchived = req.query.includeArchived === 'true';
@@ -775,7 +775,7 @@ router.get('/accountability', authMiddleware, async (req: Request, res: Response
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Check if user is admin
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
     if (!isAdmin) {
       res.status(403).json({ error: 'Admin access required' });
       return;
@@ -961,7 +961,7 @@ router.get('/people/:personId/sprint-metrics', authMiddleware, async (req: Reque
     const targetUserId = personResult.rows[0].user_id;
 
     // Check if user can view this person's metrics (self or admin)
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
     const isSelf = userId === targetUserId;
 
     if (!isAdmin && !isSelf) {
@@ -1080,7 +1080,7 @@ router.get('/accountability-grid-v2', authMiddleware, async (req: Request, res: 
     const showArchived = req.query.showArchived === 'true';
 
     // Check if user is admin
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
     if (!isAdmin) {
       res.status(403).json({ error: 'Admin access required' });
       return;
@@ -1367,7 +1367,7 @@ router.get('/reviews', authMiddleware, async (req: Request, res: Response) => {
     const showArchived = req.query.showArchived === 'true';
 
     // Check admin access
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
     if (!isAdmin) {
       res.status(403).json({ error: 'Admin access required' });
       return;
@@ -1613,7 +1613,7 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
     const showArchived = req.query.showArchived === 'true';
 
     // Check if user is admin
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
     if (!isAdmin) {
       res.status(403).json({ error: 'Admin access required' });
       return;
@@ -2012,7 +2012,7 @@ router.get('/accountability-grid', authMiddleware, async (req: Request, res: Res
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Check if user is admin
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
     if (!isAdmin) {
       res.status(403).json({ error: 'Admin access required' });
       return;

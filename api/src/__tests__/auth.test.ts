@@ -27,7 +27,7 @@ function createMockReqRes(cookies: Record<string, string> = {}) {
 
 describe('authMiddleware', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   describe('session validation', () => {
@@ -69,8 +69,8 @@ describe('authMiddleware', () => {
           created_at: now,
           is_super_admin: false,
         }]))
-        .mockResolvedValueOnce(mockQueryResult([{ id: 'membership-1' }]))
-        .mockResolvedValueOnce(mockEmptyResult());
+        // Membership check — no UPDATE query since inactivityMs < 60s
+        .mockResolvedValueOnce(mockQueryResult([{ id: 'membership-1' }]));
 
       await authMiddleware(req, res, next);
       expect(req.sessionId).toBe('valid-session');
@@ -182,6 +182,7 @@ describe('authMiddleware', () => {
       const { req, res, next } = createMockReqRes({ session_id: 'admin-session' });
       const now = new Date();
       vi.mocked(pool.query)
+        // Super-admin: no membership query, no UPDATE (inactivityMs < 60s)
         .mockResolvedValueOnce(mockQueryResult([{
           id: 'admin-session',
           user_id: 'admin-123',
@@ -189,8 +190,7 @@ describe('authMiddleware', () => {
           last_activity: now,
           created_at: now,
           is_super_admin: true,
-        }]))
-        .mockResolvedValueOnce(mockEmptyResult());
+        }]));
 
       await authMiddleware(req, res, next);
       expect(req.isSuperAdmin).toBe(true);
@@ -245,7 +245,7 @@ describe('authMiddleware', () => {
     it('does NOT refresh cookie when activity is within 60s threshold', async () => {
       const { req, res, next } = createMockReqRes({ session_id: 'valid-session' });
       const now = new Date();
-      // Last activity was 30 seconds ago (within 60s threshold)
+      // Last activity was 30 seconds ago (within 60s threshold — no UPDATE or cookie)
       const lastActivity = new Date(now.getTime() - 30 * 1000);
       vi.mocked(pool.query)
         .mockResolvedValueOnce(mockQueryResult([{
@@ -256,8 +256,7 @@ describe('authMiddleware', () => {
           created_at: now,
           is_super_admin: false,
         }]))
-        .mockResolvedValueOnce(mockQueryResult([{ id: 'membership-1' }]))
-        .mockResolvedValueOnce(mockEmptyResult());
+        .mockResolvedValueOnce(mockQueryResult([{ id: 'membership-1' }]));
 
       await authMiddleware(req, res, next);
       expect(res.cookie).not.toHaveBeenCalled();

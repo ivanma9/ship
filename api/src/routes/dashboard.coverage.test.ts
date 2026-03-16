@@ -250,6 +250,8 @@ describe('Dashboard API coverage', () => {
           {
             id: 'plan-3',
             title: 'Week 3 plan',
+            document_type: 'weekly_plan',
+            week_number: 3,
             properties: { submitted_at: '2026-03-16T10:00:00Z' },
             content: {
               type: 'doc',
@@ -262,15 +264,13 @@ describe('Dashboard API coverage', () => {
               ],
             },
           },
-        ],
-      } as never)
-      .mockResolvedValueOnce({ rows: [] } as never)
-      .mockResolvedValueOnce({
-        rows: [
           {
             id: 'retro-2',
             title: 'Week 2 retro',
+            document_type: 'weekly_retro',
+            week_number: 2,
             properties: { submitted_at: null },
+            content: null,
           },
         ],
       } as never)

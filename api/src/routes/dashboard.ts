@@ -46,7 +46,7 @@ router.get('/my-work', authMiddleware, authHandler(async (req: AuthenticatedRequ
     const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Get workspace sprint configuration to calculate current sprint number
     const workspaceResult = await pool.query(
@@ -574,73 +574,61 @@ router.get('/my-week', authMiddleware, authHandler(async (req: AuthenticatedRequ
     const weekEnd = new Date(weekStart);
     weekEnd.setUTCDate(weekEnd.getUTCDate() + sprintDuration - 1);
 
-    // 3. Fetch plan for target week (by person_id + week_number only)
-    const planResult = await pool.query(
-      `SELECT id, title, content, properties, created_at, updated_at
+    // 3–5. Fetch plan + retro for target week and retro for previous week in one query
+    const weekNumbers = previousWeekNumber > 0
+      ? [targetWeekNumber, previousWeekNumber]
+      : [targetWeekNumber];
+    const weekDocsResult = await pool.query(
+      `SELECT id, title, content, properties,
+              document_type,
+              (properties->>'week_number')::int AS week_number
        FROM documents
        WHERE workspace_id = $1
-         AND document_type = 'weekly_plan'
+         AND document_type IN ('weekly_plan', 'weekly_retro')
          AND (properties->>'person_id') = $2
-         AND (properties->>'week_number')::int = $3
+         AND (properties->>'week_number')::int = ANY($3::int[])
          AND archived_at IS NULL
-         AND deleted_at IS NULL
-       LIMIT 1`,
-      [workspaceId, personId, targetWeekNumber]
+         AND deleted_at IS NULL`,
+      [workspaceId, personId, weekNumbers]
     );
 
-    const plan = planResult.rows.length > 0
+    const planRow = weekDocsResult.rows.find(
+      r => r.document_type === 'weekly_plan' && r.week_number === targetWeekNumber
+    );
+    const retroRow = weekDocsResult.rows.find(
+      r => r.document_type === 'weekly_retro' && r.week_number === targetWeekNumber
+    );
+    const prevRetroRow = previousWeekNumber > 0
+      ? weekDocsResult.rows.find(
+          r => r.document_type === 'weekly_retro' && r.week_number === previousWeekNumber
+        )
+      : undefined;
+
+    const plan = planRow
       ? {
-          id: planResult.rows[0].id,
-          title: planResult.rows[0].title,
-          submitted_at: planResult.rows[0].properties?.submitted_at || null,
-          items: extractPlanItems(planResult.rows[0].content),
+          id: planRow.id,
+          title: planRow.title,
+          submitted_at: planRow.properties?.submitted_at || null,
+          items: extractPlanItems(planRow.content),
         }
       : null;
 
-    // 4. Fetch retro for target week
-    const retroResult = await pool.query(
-      `SELECT id, title, content, properties, created_at, updated_at
-       FROM documents
-       WHERE workspace_id = $1
-         AND document_type = 'weekly_retro'
-         AND (properties->>'person_id') = $2
-         AND (properties->>'week_number')::int = $3
-         AND archived_at IS NULL
-         AND deleted_at IS NULL
-       LIMIT 1`,
-      [workspaceId, personId, targetWeekNumber]
-    );
-
-    const retro = retroResult.rows.length > 0
+    const retro = retroRow
       ? {
-          id: retroResult.rows[0].id,
-          title: retroResult.rows[0].title,
-          submitted_at: retroResult.rows[0].properties?.submitted_at || null,
-          items: extractPlanItems(retroResult.rows[0].content),
+          id: retroRow.id,
+          title: retroRow.title,
+          submitted_at: retroRow.properties?.submitted_at || null,
+          items: extractPlanItems(retroRow.content),
         }
       : null;
 
-    // 5. Fetch previous week retro (for "incomplete retro" nudge)
     let previousRetro = null;
     if (previousWeekNumber > 0) {
-      const prevRetroResult = await pool.query(
-        `SELECT id, title, properties
-         FROM documents
-         WHERE workspace_id = $1
-           AND document_type = 'weekly_retro'
-           AND (properties->>'person_id') = $2
-           AND (properties->>'week_number')::int = $3
-           AND archived_at IS NULL
-           AND deleted_at IS NULL
-         LIMIT 1`,
-        [workspaceId, personId, previousWeekNumber]
-      );
-
-      previousRetro = prevRetroResult.rows.length > 0
+      previousRetro = prevRetroRow
         ? {
-            id: prevRetroResult.rows[0].id,
-            title: prevRetroResult.rows[0].title,
-            submitted_at: prevRetroResult.rows[0].properties?.submitted_at || null,
+            id: prevRetroRow.id,
+            title: prevRetroRow.title,
+            submitted_at: prevRetroRow.properties?.submitted_at || null,
             week_number: previousWeekNumber,
           }
         : { id: null, title: null, submitted_at: null, week_number: previousWeekNumber };

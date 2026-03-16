@@ -343,7 +343,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     }
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Build ORDER BY clause - ice_score is computed, others are from properties or columns
     let orderByClause: string;
@@ -442,7 +442,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Same inferred status subquery as list endpoint (allocation-based)
     const inferredStatusSubquery = `
@@ -629,7 +629,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     }
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify project exists and user can access it
     const existing = await pool.query(
@@ -877,7 +877,7 @@ router.delete('/:id', authMiddleware, async (req: Request, res: Response) => {
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // First verify user can access the project
     const accessCheck = await pool.query(
@@ -919,7 +919,7 @@ router.get('/:id/retro', authMiddleware, async (req: Request, res: Response) => 
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Get project
     const projectResult = await pool.query(
@@ -1024,7 +1024,7 @@ router.post('/:id/retro', authMiddleware, async (req: Request, res: Response) =>
     }
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify project exists and user can access it
     const existing = await pool.query(
@@ -1170,7 +1170,7 @@ router.get('/:id/issues', authMiddleware, async (req: Request, res: Response) =>
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify project exists and user can access it
     const projectCheck = await pool.query(
@@ -1245,7 +1245,7 @@ router.get('/:id/weeks', authMiddleware, async (req: Request, res: Response) => 
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify project exists and user can access it
     const projectCheck = await pool.query(
@@ -1304,7 +1304,7 @@ router.get('/:id/sprints', authMiddleware, async (req: Request, res: Response) =
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify project exists and user can access it
     const projectCheck = await pool.query(
@@ -1369,7 +1369,7 @@ router.post('/:id/sprints', authMiddleware, async (req: Request, res: Response) 
     }
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify project exists, user can access it, and get workspace info
     const projectCheck = await pool.query(
@@ -1540,7 +1540,7 @@ router.patch('/:id/retro', authMiddleware, async (req: Request, res: Response) =
     }
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify project exists and user can access it
     const existing = await pool.query(
@@ -1648,7 +1648,7 @@ router.post('/:id/approve-plan', authMiddleware, async (req: Request, res: Respo
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for admin check
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify project exists and get its properties
     const projectResult = await pool.query(
@@ -1712,7 +1712,7 @@ router.post('/:id/approve-retro', authMiddleware, async (req: Request, res: Resp
     const workspaceId = (req as AuthenticatedRequest).workspaceId;
 
     // Get visibility context for admin check
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify project exists and get its properties
     const projectResult = await pool.query(

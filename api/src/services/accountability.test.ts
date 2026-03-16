@@ -121,6 +121,7 @@ describe('Accountability Service', () => {
         .mockResolvedValueOnce(mockEmptyResult())
         .mockResolvedValueOnce(mockEmptyResult())
         .mockResolvedValueOnce(mockEmptyResult())
+        .mockResolvedValueOnce(mockEmptyResult())
         .mockResolvedValueOnce(mockEmptyResult());
 
       const result = await checkMissingAccountability(userId, workspaceId);
@@ -307,11 +308,13 @@ describe('Accountability Service', () => {
 
       // Mock queries in execution order:
       // 1. workspace, 2. person,
-      // 3. owned sprints (sprint accountability), 4-5. Week 1 plan+retro queries,
-      // 6. Week 2 plan query, 7. changes_requested check
+      // 3. owned sprints (sprint accountability), 4. past sprints without review,
+      // 5-6. Week 1 plan+retro queries, 7. Week 2 plan query, 8. changes_requested check
       // (standup skipped because isBusinessDay=false)
       mockSetupQueries()
         // owned sprints (sprint accountability) - no sprints owned
+        .mockResolvedValueOnce(mockEmptyResult())
+        // past sprints without review - none
         .mockResolvedValueOnce(mockEmptyResult())
         // Week 1 plan - exists (done)
         .mockResolvedValueOnce(mockQueryResult([{ id: 'plan-1', content: { type: 'doc', content: [{ type: 'text', text: 'done' }] } }]))
@@ -379,6 +382,8 @@ describe('Accountability Service', () => {
         ]))
         // owned sprints
         .mockResolvedValueOnce(mockEmptyResult())
+        // past sprints without review
+        .mockResolvedValueOnce(mockEmptyResult())
         // changes_requested check
         .mockResolvedValueOnce(mockEmptyResult());
 
@@ -404,6 +409,8 @@ describe('Accountability Service', () => {
         ]))
         // grouped issue counts
         .mockResolvedValueOnce(mockQueryResult([{ sprint_id: 'sprint-2', issue_count: '2' }]))
+        // past sprints without review
+        .mockResolvedValueOnce(mockEmptyResult())
         // changes_requested check
         .mockResolvedValueOnce(mockEmptyResult());
 
@@ -430,6 +437,8 @@ describe('Accountability Service', () => {
 
       mockSetupQueries()
         // owned sprints
+        .mockResolvedValueOnce(mockEmptyResult())
+        // past sprints without review
         .mockResolvedValueOnce(mockEmptyResult())
         // current sprint weekly_plan lookup
         .mockResolvedValueOnce(mockEmptyResult())

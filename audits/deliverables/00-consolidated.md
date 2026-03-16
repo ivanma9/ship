@@ -401,6 +401,15 @@ _Source: `audits/artifacts/db-query-efficiency-after.json` (captured 2026-03-13T
 
 _Source: `db-query-efficiency-audit.ts` re-run 2026-03-16T02:34:15Z after all five 2026-03-15 optimizations (Programs N+1, covering indexes, documents owner consolidation, dashboard CTE, COUNT join reorder)._
 
+- **Programs N+1 fix** (`programs.ts`): Replaced 2N correlated `COUNT(*)` subqueries with `LEFT JOIN` derived tables. Execution time −53% (1.16 ms → 0.55 ms avg), planning time −75%.
+- **Covering composite indexes** (migration 039): Two composite indexes on `document_associations` (`(document_id, relationship_type, related_id)` and reverse) enabling index-only scans for issues, programs, and dashboard routes.
+- **Dashboard CTE** (`dashboard.ts`): Replaced O(n) correlated subquery for project `inferred_status` (4 JOINs per project row) with a single `project_statuses` CTE. O(n) → O(1) query count.
+- **Documents owner consolidation** (`documents.ts`): Unified two separate owner lookup code paths (project vs sprint) into a single query. −1 DB round-trip per document detail fetch.
+- **Weekly doc query merge** (`dashboard.ts`): Merged three separate `weekly_plan`/`weekly_retro` queries in `GET /api/dashboard/my-week` into a single `document_type IN ('weekly_plan','weekly_retro') AND week_number = ANY(...)` query. −2 queries per `/my-week` request.
+- **Auth /me workspace dedup** (`auth.ts`): Eliminated redundant `pool.query` for current-workspace lookup in `GET /api/auth/me` by reusing the already-fetched workspaces result. −1 query per `/me` request.
+- **isAdmin caching in authMiddleware** (`auth.ts`): Fetch `role` in the existing membership query and cache as `req.isAdmin`; `getVisibilityContext` skips the second DB round-trip. −1 query per endpoint that calls it.
+- **Throttled last_activity UPDATE** (`auth.ts`): Gate the session `UPDATE` (and cookie refresh) behind a 60s threshold, same as the existing cookie-refresh throttle. −1 query per rapid-fire request.
+
 #### Final Query Counts per User Flow
 
 | User Flow | Before | **Final (03-16)** | Delta |

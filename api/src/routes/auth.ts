@@ -282,21 +282,15 @@ router.get('/me', authMiddleware, async (req: Request, res: Response): Promise<v
       [req.userId]
     );
 
-    // Get current workspace info
+    // Get current workspace info — reuse already-fetched workspaces list
     let currentWorkspace = null;
     if (req.workspaceId) {
-      const currentResult = await pool.query(
-        `SELECT w.id, w.name, wm.role
-         FROM workspaces w
-         LEFT JOIN workspace_memberships wm ON w.id = wm.workspace_id AND wm.user_id = $2
-         WHERE w.id = $1`,
-        [req.workspaceId, req.userId]
-      );
-      if (currentResult.rows[0]) {
+      const found = workspacesResult.rows.find(w => w.id === req.workspaceId);
+      if (found) {
         currentWorkspace = {
-          id: currentResult.rows[0].id,
-          name: currentResult.rows[0].name,
-          role: currentResult.rows[0].role || 'admin', // Super-admin without membership
+          id: found.id,
+          name: found.name,
+          role: found.role || 'admin', // Super-admin without membership
         };
       }
     }
