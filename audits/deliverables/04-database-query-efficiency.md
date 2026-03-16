@@ -509,6 +509,90 @@ The three `weekly_plan`/`weekly_retro` queries have identical `WHERE` predicates
 
 ---
 
+## 2026-03-15 — isAdmin Cache in authMiddleware (eliminates redundant visibility query)
+
+### What was changed
+
+**`api/src/middleware/auth.ts`** and **`api/src/middleware/visibility.ts`**
+
+`authMiddleware` already queries `workspace_memberships` to verify the user still belongs to the workspace (`SELECT id FROM workspace_memberships WHERE ...`). Every route handler then calls `getVisibilityContext(userId, workspaceId)` which queries the **same table again** for the `role` column.
+
+**Fix:** Changed the membership SELECT to `SELECT id, role FROM ...`, stored `req.isAdmin = session.is_super_admin || membershipRole === 'admin'` on the request object, and added an optional `cachedIsAdmin?: boolean` parameter to `getVisibilityContext`. Updated all 74 call sites across route files to pass `req.isAdmin`, skipping the second round-trip entirely.
+
+### Impact
+
+Saves 1 query per HTTP request in every route that calls `getVisibilityContext`. The audited flows each involve multiple such requests:
+
+| Flow | Endpoints calling getVisibilityContext | Queries saved |
+|------|---------:|------:|
+| `view_document` | 4 | −4 |
+| `list_issues` | 4 | −4 |
+| `load_sprint_board` | 3 | −3 |
+| `load_main_page` | ~5 | −5 |
+
+### Commits
+
+- `b53c9e7` — cache isAdmin in authMiddleware, pass to getVisibilityContext at all 74 call sites
+
+---
+
+## 2026-03-15 — Throttled last_activity UPDATE (eliminates per-request session write)
+
+### What was changed
+
+**`api/src/middleware/auth.ts`**
+
+The `UPDATE sessions SET last_activity = $1 WHERE id = $2` fired on **every single HTTP request** unconditionally. The cookie refresh was already throttled to 60 seconds (`inactivityMs > COOKIE_REFRESH_THRESHOLD_MS`). The activity UPDATE has the same semantics — the 15-minute inactivity timeout is checked against the in-memory session value, so a 60-second staleness in the persisted value is negligible.
+
+**Fix:** Merged both the UPDATE and the cookie refresh into a single `if (inactivityMs > ACTIVITY_UPDATE_THRESHOLD_MS)` block (threshold: 60 seconds). For back-to-back requests within 60s — the common case in multi-endpoint page loads — the write is skipped entirely.
+
+### Security analysis
+
+The inactivity timeout check (`inactivityMs > SESSION_TIMEOUT_MS`) reads `session.last_activity` from the already-fetched session row, not from a re-query. Skipping the persist for up to 60s does not affect timeout enforcement — the worst case is a 60s grace extension on the 15-minute window, which is acceptable.
+
+### Impact
+
+Saves 1 query per rapid-fire request (all requests within 60s of the previous one). For audited flows making multiple sequential requests:
+
+| Flow | Requests | Queries saved | Before → After |
+|------|:--------:|------:|------:|
+| `load_main_page` | 9 | −8 | 43 → 39 |
+| `view_document` | 4 | −3 | 12 → 9 |
+| `list_issues` | 4 | −3 | 12 → 9 |
+| `load_sprint_board` | 3 | −2 | 11 → 8 |
+| `search_content` | 2 | −1 | 4 → 3 |
+
+### Commits
+
+- `6c51ab4` — throttle last_activity UPDATE to once per 60s; update auth tests to vi.resetAllMocks()
+
+---
+
+## Final Query Counts — All Optimizations (2026-03-15)
+
+_Source: `npx tsx audits/artifacts/db-query-efficiency-audit.ts` — run against seeded `ship_master` after all changes on branch `010-db-query-count-reduction`._
+
+| User Flow | Baseline (2026-03-10) | **Final After** | **Delta** |
+|-----------|----------------------:|----------------:|----------:|
+| Load main page | 54 | **39** | **−15 (−28%)** ✅ |
+| View a document | 16 | **9** | **−7 (−44%)** ✅ |
+| List issues | 17 | **9** | **−8 (−47%)** ✅ |
+| Load sprint board | 14 | **8** | **−6 (−43%)** ✅ |
+| Search content | 5 | **3** | **−2 (−40%)** ✅ |
+
+All five flows exceed the 20% query reduction target.
+
+### Optimization summary
+
+| Change | Location | Mechanism | Queries saved (per flow) |
+|--------|----------|-----------|--------------------------|
+| Merged weekly doc queries | `dashboard.ts` | 3 queries → 1 IN-clause query | −2 per `/my-week` |
+| Auth /me workspace dedup | `auth.ts` | `.find()` on already-fetched rows | −1 per `/me` |
+| isAdmin cache in authMiddleware | `auth.ts`, `visibility.ts` | Fetch role in existing membership check | −1 per endpoint using `getVisibilityContext` |
+| Throttled last_activity UPDATE | `auth.ts` | Gate UPDATE behind 60s threshold | −1 per back-to-back request |
+
+---
+
 ## Test Status
 
 All unit tests pass: **548 tests across 37 test files**, 0 failures (vitest, 2026-03-15).

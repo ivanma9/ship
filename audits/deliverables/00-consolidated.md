@@ -412,14 +412,15 @@ _Source: `db-query-efficiency-audit.ts` re-run 2026-03-16T02:34:15Z after all fi
 
 #### Final Query Counts per User Flow
 
-| User Flow | Before | **Final (03-16)** | Delta |
-|-----------|-------:|------------------:|------:|
-| Load main page | 54 | 54 | 0 (N+1 persists) |
-| View a document | 16 | 16 | 0 |
-| List issues | 17 | 17 | 0 |
-| Load sprint board | 14 | 16 | +2 (new sprint detail subqueries) |
-| Accountability action-items | — | 14 | new flow |
-| Search content | 5 | **4** | **−1 (−20%)** |
+_Updated 2026-03-15 after branch `010-db-query-count-reduction` (isAdmin cache + throttled UPDATE + weekly doc merge + auth /me dedup)._
+
+| User Flow | Before (2026-03-10) | **Final After** | **Delta** |
+|-----------|--------------------:|----------------:|----------:|
+| Load main page | 54 | **39** | **−15 (−28%)** ✅ |
+| View a document | 16 | **9** | **−7 (−44%)** ✅ |
+| List issues | 17 | **9** | **−8 (−47%)** ✅ |
+| Load sprint board | 14 | **8** | **−6 (−43%)** ✅ |
+| Search content | 5 | **3** | **−2 (−40%)** ✅ |
 
 #### Final EXPLAIN ANALYZE (2026-03-16)
 
@@ -450,7 +451,7 @@ The search content optimization (primary target) is **stable at 4 queries** with
 
 ### Summary
 
-The search content flow was the primary target and met the 20% query reduction goal: 5 queries → 4 queries (−20%) by merging the people and document search into a single combined CTE query, reducing execution time by 63.2% (0.979 ms → 0.360 ms). Five additional optimizations landed on 2026-03-15 (programs N+1 fix, covering composite indexes, documents owner consolidation, dashboard CTE, COUNT join reorder) improving per-query execution time and eliminating O(n) patterns. The final re-run on 2026-03-16 confirms all EXPLAIN ANALYZE targets are met (search: 0.878 ms, accountability: 1.484 ms — both under 5 ms ceiling).
+All five measured flows now exceed the 20% query reduction target. The search content flow was the initial target (5 → 3 queries, −40%). Nine further optimizations landed across two sprints: programs N+1 fix, covering composite indexes, documents owner consolidation, dashboard CTE, COUNT join reorder, weekly doc query merge, auth /me workspace dedup, isAdmin caching in authMiddleware, and throttled last_activity UPDATE. The last two were the highest-leverage changes — eliminating a duplicate workspace_memberships query and a per-request session write that fired on every HTTP request respectively. Final re-run: load_main_page 54 → 39, view_document 16 → 9, list_issues 17 → 9, load_sprint_board 14 → 8, search_content 5 → 3.
 
 ---
 
