@@ -71,8 +71,10 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
-  // Longer timeout for container startup
-  timeout: 60000,
+  // Longer timeout for container startup — 120s to match Docker container startup time.
+  // With 2+ parallel workers each spinning up PostgreSQL containers, the 60s limit
+  // was hit before containers became ready, causing spurious fixture-setup failures.
+  timeout: 120000,
   // Global setup builds API and Web once before all workers
   globalSetup: './e2e/global-setup.ts',
   projects: [

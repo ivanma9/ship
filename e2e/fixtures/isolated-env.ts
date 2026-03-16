@@ -196,7 +196,7 @@ export const test = base.extend<
 
         // Wait for server to be ready
         const apiUrl = `http://localhost:${port}`;
-        await waitForServer(`${apiUrl}/health`, 30000);
+        await waitForServer(`${apiUrl}/health`, 60000);
         if (debug) console.log(`${workerTag} API server ready at ${apiUrl}`);
 
         await use({ url: apiUrl, process: proc });
@@ -260,7 +260,7 @@ export const test = base.extend<
         });
 
         const webUrl = `http://localhost:${port}`;
-        await waitForServer(webUrl, 30000); // Preview starts much faster than dev
+        await waitForServer(webUrl, 60000); // Preview starts much faster than dev
         if (debug) console.log(`${workerTag} Vite preview server ready at ${webUrl}`);
 
         await use({ url: webUrl, process: proc });
