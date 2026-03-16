@@ -18,11 +18,11 @@ describe('api auth turbulence gating', () => {
     __apiTestUtils.markAuthenticatedSuccessForTests();
 
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'retry me' } }), {
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'SESSION_EXPIRED', message: 'retry me' } }), {
         status: 401,
         headers: { 'content-type': 'application/json' },
       }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'retry me' } }), {
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: { code: 'SESSION_EXPIRED', message: 'retry me' } }), {
         status: 401,
         headers: { 'content-type': 'application/json' },
       }))
@@ -45,7 +45,7 @@ describe('api auth turbulence gating', () => {
     __apiTestUtils.markAuthenticatedSuccessForTests();
 
     const fetchMock = vi.fn(() => Promise.resolve(new Response(JSON.stringify({
-      error: { code: 'UNAUTHORIZED', message: 'still failing' },
+      error: { code: 'SESSION_EXPIRED', message: 'still failing' },
     }), {
       status: 401,
       headers: { 'content-type': 'application/json' },
