@@ -37,7 +37,7 @@ router.post('/:id/iterations', authMiddleware, authHandler(async (req: Authentic
     }
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify sprint exists and user can access it
     const sprintCheck = await pool.query(
@@ -105,7 +105,7 @@ router.get('/:id/iterations', authMiddleware, authHandler(async (req: Authentica
     const queryParams = queryParsed.success ? queryParsed.data : {};
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify sprint exists and user can access it
     const sprintCheck = await pool.query(

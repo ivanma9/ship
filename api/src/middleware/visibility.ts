@@ -25,8 +25,10 @@ export async function isWorkspaceAdmin(userId: string, workspaceId: string): Pro
  */
 export async function getVisibilityContext(
   userId: string,
-  workspaceId: string
+  workspaceId: string,
+  cachedIsAdmin?: boolean
 ): Promise<{ isAdmin: boolean }> {
+  if (cachedIsAdmin !== undefined) return { isAdmin: cachedIsAdmin };
   const isAdmin = await isWorkspaceAdmin(userId, workspaceId);
   return { isAdmin };
 }

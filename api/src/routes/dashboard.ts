@@ -46,7 +46,7 @@ router.get('/my-work', authMiddleware, authHandler(async (req: AuthenticatedRequ
     const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Get workspace sprint configuration to calculate current sprint number
     const workspaceResult = await pool.query(

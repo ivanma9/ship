@@ -21,7 +21,7 @@ router.get('/:id/backlinks', authMiddleware, authHandler(async (req: Authenticat
     const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify the document exists and user can access it
     const docResult = await pool.query(
@@ -83,7 +83,7 @@ router.post('/:id/links', authMiddleware, authHandler(async (req: AuthenticatedR
     const { target_ids } = parsed.data;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify the source document exists and user can access it
     const docResult = await pool.query(

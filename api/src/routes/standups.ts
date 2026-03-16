@@ -355,7 +355,7 @@ router.patch('/:id', authMiddleware, authHandler(async (req: AuthenticatedReques
     const { content, title } = parsed.data;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify standup exists and user can access it
     // Only the author or an admin can update a standup
@@ -463,7 +463,7 @@ router.delete('/:id', authMiddleware, authHandler(async (req: AuthenticatedReque
     const workspaceId = req.workspaceId;
 
     // Get visibility context for filtering
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    const { isAdmin } = await getVisibilityContext(userId, workspaceId, req.isAdmin);
 
     // Verify standup exists and user can access it
     const existing = await pool.query(

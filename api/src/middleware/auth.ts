@@ -13,6 +13,7 @@ declare global {
       workspaceId?: string;
       isSuperAdmin?: boolean;
       isApiToken?: boolean; // True when authenticated via API token
+      isAdmin?: boolean; // Cached from workspace_memberships during auth — avoids second DB lookup in getVisibilityContext
     }
   }
 }
@@ -181,9 +182,11 @@ export async function authMiddleware(
     }
 
     // Verify user still has access to the workspace (unless super-admin)
+    // Also fetch role here so getVisibilityContext can skip a second DB round-trip
+    let membershipRole: string | null = null;
     if (session.workspace_id && !session.is_super_admin) {
       const membershipResult = await pool.query(
-        'SELECT id FROM workspace_memberships WHERE workspace_id = $1 AND user_id = $2',
+        'SELECT id, role FROM workspace_memberships WHERE workspace_id = $1 AND user_id = $2',
         [session.workspace_id, session.user_id]
       );
 
@@ -200,6 +203,7 @@ export async function authMiddleware(
         });
         return;
       }
+      membershipRole = membershipResult.rows[0].role;
     }
 
     // Update last activity
@@ -223,6 +227,8 @@ export async function authMiddleware(
     req.userId = session.user_id;
     req.workspaceId = session.workspace_id;
     req.isSuperAdmin = session.is_super_admin;
+    // Cache isAdmin so getVisibilityContext can skip a redundant workspace_memberships query
+    req.isAdmin = session.is_super_admin || membershipRole === 'admin';
 
     next();
   } catch (error: unknown) {
