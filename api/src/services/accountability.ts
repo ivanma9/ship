@@ -131,7 +131,7 @@ export async function checkMissingAccountability(
        AND (properties->>'user_id')::uuid = $2`,
     [workspaceId, userId]
   );
-  const personId = personResult.rows[0]?.id || null;
+  const personId = personResult.rows[0]?.id ?? null;
 
   // Parse workspace start date
   let workspaceStartDate: Date;
@@ -159,21 +159,21 @@ export async function checkMissingAccountability(
   };
 
   // Check for missing standups (current sprint, business days only)
-  if (todayStr) {
-    const standupItems = await checkMissingStandups(userId, workspaceId, ctx);
-    items.push(...standupItems);
-  }
+  const standupItems = await checkMissingStandups(userId, workspaceId, ctx);
+  items.push(...standupItems);
 
   // Check sprint accountability: started status and issues
-  if (todayStr) {
-    const sprintItems = await checkSprintAccountability(userId, workspaceId, ctx, personId);
-    items.push(...sprintItems);
-  }
+  const sprintItems = await checkSprintAccountability(userId, workspaceId, ctx, personId);
+  items.push(...sprintItems);
+
+  // Check for missing sprint reviews (completed sprints without review)
+  const sprintReviewItems = await checkMissingSprintReviews(userId, workspaceId, ctx);
+  items.push(...sprintReviewItems);
 
   // Check for per-person weekly_plan and weekly_retro (based on allocations)
   // Check both current sprint AND next sprint, since plans become due 2 days before
   // the sprint starts (Saturday before a Monday-start week).
-  if (personId && todayStr) {
+  if (personId) {
     const weeklyPersonItems = await checkWeeklyPersonAccountability(
       userId, workspaceId, personId, ctx, currentSprintNumber
     );
@@ -529,11 +529,9 @@ async function checkWeeklyPersonAccountability(
 async function checkMissingSprintReviews(
   userId: string,
   workspaceId: string,
-  workspaceStartDate: Date,
-  sprintDuration: number,
-  today: Date,
-  todayStr: string
+  ctx: WorkspaceContext
 ): Promise<MissingAccountabilityItem[]> {
+  const { workspaceStartDate, sprintDuration, today, todayStr } = ctx;
   const items: MissingAccountabilityItem[] = [];
 
   // Find past sprints where user is owner without review
