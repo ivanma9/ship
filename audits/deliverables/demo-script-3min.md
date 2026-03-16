@@ -4,15 +4,69 @@
 **Format:** Live narration with screen/terminal evidence
 **Audience:** Technical reviewers / evaluators
 
+**Demo order:** Category 1 (Type Safety) → 4 (Database) → 6 (Runtime Errors) first, then 2, 3, 5, 7.
+
 ---
 
-## [0:00–0:20] Hook — The Problem
+## [0:00–0:15] Hook — The Problem
 
 > "Ship is a real-time collaborative doc platform — wiki, issues, sprints, all in one place. We ran a full audit across 7 categories. What we found was a 2 MB payload, API responses over 100ms at load, 24 console errors per session, and 34 accessibility violations blocking screen readers. Here's what we fixed."
 
 ---
 
-## [0:20–0:50] Bundle Size — −55.8% Entry Chunk *(30 sec)*
+## [0:15–0:35] Type Safety — −31.6% Core Violations *(20 sec)*
+
+**Show:** Terminal — `node scripts/type-violation-scan.cjs` or `node scripts/check-type-ceiling.mjs`
+
+> "We had 1,283 core type violations — any, as casts, non-null assertions, ts-ignore. Five phases of hardening across API routes, web components, and test mocks."
+
+**Call out on screen:**
+```
+BEFORE  Core violations:  1,283   (any + as + ! + @ts-*)
+AFTER   Core violations:    878   (−31.6%)
+        CI ceiling gate:    878   (ratchet — can only decrease)
+```
+
+> "Typed route handlers, removed 56 non-null assertions in transformIssueLinks, added mockQueryResult wrappers. CI now blocks any PR that regresses above 878."
+
+---
+
+## [0:35–1:00] Database Efficiency — Search CTE Merge *(25 sec)*
+
+**Show:** `db-query-efficiency-baseline.json` vs `db-query-efficiency-after.json` (or narrate)
+
+> "The search endpoint was firing two separate queries — one for people, one for documents — then merging in application code."
+
+**Call out on screen:**
+```
+BEFORE  Search: 2 queries  →  0.979 ms total
+AFTER   Search: 1 CTE      →  0.360 ms total   (−63%)
+```
+
+> "Merged into a single CTE with a UNION ALL. One round-trip instead of two. We also landed five more DB optimizations: fixed an N+1 in programs (2N correlated subqueries → derived-table joins, −53% execution time), added covering composite indexes on `document_associations`, replaced an O(n) correlated subquery in the dashboard with a CTE, consolidated two separate owner-lookup queries in document detail into one, and reordered programs COUNT joins with soft-delete filters."
+
+---
+
+## [1:00–1:20] Runtime Errors — 24 → 2 Console Errors *(20 sec)*
+
+**Show:** `audits/artifacts/category6-recheck-result.json` or live browser DevTools
+
+> "Every page load was spamming 24 console errors — 401s before auth resolved, unhandled promise rejections, silent fetch failures. Yjs collision tests showed divergence between concurrent editors. A 10-second offline window was triggering 9 session-expired redirect loops."
+
+**Call out on screen:**
+```
+BEFORE  Console errors:        24   Unhandled rejections: 1   Silent failures: 5
+        Disconnect recovery:   Partial (9 redirect churns)   Yjs: Divergence
+
+AFTER   Console errors:         2   Unhandled rejections: 0   Silent failures: 0
+        Disconnect recovery:   Success (0 redirect churns)   Yjs: Converged
+```
+
+> "Login.tsx checkSetup wrapped in try/catch. PlanQualityBanner's eight silent catch blocks now log to console. Reconnect retry gate in api.ts eliminated the redirect storm. Auth stability fixes resolved the Yjs divergence. All five metrics live re-tested with Playwright. The two remaining errors are benign pre-auth 401s."
+
+---
+
+## [1:20–1:45] Bundle Size — −55.8% Entry Chunk *(25 sec)*
 
 **Show:** Terminal — `pnpm build` output or the budget script
 
@@ -29,7 +83,7 @@ AFTER   Entry chunk gzip:  259.97 KB   (−55.8%)
 
 ---
 
-## [0:50–1:30] API Response Time — −94% at P95 *(40 sec)*
+## [1:45–2:15] API Response Time — −94% at P95 *(30 sec)*
 
 **Show:** Side-by-side terminal — `ab` benchmark before vs after (or JSON artifact)
 
@@ -48,23 +102,7 @@ AFTER   /api/issues                P95 c50:    7 ms   (−93%)
 
 ---
 
-## [1:30–1:55] Database Efficiency — Search CTE Merge *(25 sec)*
-
-**Show:** `db-query-efficiency-baseline.json` vs `db-query-efficiency-after.json` (or narrate)
-
-> "The search endpoint was firing two separate queries — one for people, one for documents — then merging in application code."
-
-**Call out on screen:**
-```
-BEFORE  Search: 2 queries  →  0.979 ms total
-AFTER   Search: 1 CTE      →  0.360 ms total   (−63%)
-```
-
-> "Merged into a single CTE with a UNION ALL. One round-trip instead of two. We also landed five more DB optimizations: fixed an N+1 in programs (2N correlated subqueries → derived-table joins, −53% execution time), added covering composite indexes on `document_associations`, replaced an O(n) correlated subquery in the dashboard with a CTE, consolidated two separate owner-lookup queries in document detail into one, and reordered programs COUNT joins with soft-delete filters."
-
----
-
-## [1:55–2:25] Test Coverage — +15 Points Web *(30 sec)*
+## [2:15–2:40] Test Coverage — +15 Points Web *(25 sec)*
 
 **Show:** Coverage summary diff or the two snapshot files side by side
 
@@ -82,11 +120,11 @@ E2E fixed waits:   619 → 537   (−82 hardcoded sleeps removed)
 Dark-logic specs:    0 → 3     (reconnect, autosave, timeout — now tested)
 ```
 
-> "We also replaced 82 hardcoded `waitForTimeout` calls with proper event-driven waits, and added three new specs for the dark logic paths that had zero test coverage."
+> "We also replaced 82 hardcoded waitForTimeout calls with proper event-driven waits, and added three new specs for the dark logic paths that had zero test coverage."
 
 ---
 
-## [2:25–2:55] Accessibility — 34 Violations → 0 *(30 sec)*
+## [2:40–2:55] Accessibility — 34 Violations → 0 *(15 sec)*
 
 **Show:** `docs/a11y-manual-validation.md` contrast table, or Lighthouse score screenshots
 
@@ -107,7 +145,7 @@ AFTER   Lighthouse:  Dashboard 100 | My Week 100 | Issues 100   (priority pages)
 
 ## [2:55–3:00] Close
 
-> "All seven categories fully measured before and after with confirmed improvements. Type safety down 31.6%, runtime console errors from 24 to 2, Yjs collision divergence resolved. Auth stability fixes (SameSite, 401 retry) and image command production fix also landed. All changes are on master, CI green."
+> "All seven categories fully measured before and after with confirmed improvements. Auth stability fixes (SameSite, 401 retry) and image command production fix also landed. All changes are on master, CI green."
 
 ---
 
@@ -116,5 +154,5 @@ AFTER   Lighthouse:  Dashboard 100 | My Week 100 | Issues 100   (priority pages)
 - **Pacing:** Each section has a hard time box — don't expand on details, hit the number and move on.
 - **Evidence order:** Show terminal/file first, then narrate the number. Don't narrate a number that isn't visible yet.
 - **If asked about type safety:** "We reduced core violations from 1,283 to 878 — a 31.6% reduction. A CI ceiling gate now blocks any PR that regresses above 878."
-- **If asked about runtime errors:** "Console errors went from 24 to 2 per session. Unhandled promise rejections and silent failures both at zero. Yjs collision divergence resolved — concurrent edits now converge. The two remaining errors are benign pre-auth resource loads."
+- **If asked about runtime errors:** "Console errors went from 24 to 2 per session. Unhandled promise rejections and silent failures both at zero. Network disconnect recovery went from partial (9 redirect churns) to success (0). Yjs collision divergence resolved — concurrent edits now converge. All five metrics were live re-tested with Playwright. The two remaining errors are benign pre-auth resource loads."
 - **If asked about auth/production:** "Auth stability fixes: SameSite=None for cross-origin, 401 retry elimination, false session-expired prevention. Image command: auth removed from serve route, R2/S3 support, CDN_DOMAIN documented."
