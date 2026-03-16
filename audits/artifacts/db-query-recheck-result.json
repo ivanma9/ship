@@ -1,16 +1,16 @@
 {
-  "capturedAt": "2026-03-15T02:55:47.862Z",
+  "capturedAt": "2026-03-16T02:34:24.331Z",
   "db": "postgresql://***@localhost:5432/ship_master",
   "results": [
     {
       "query": "Search CTE (merged)",
-      "executionMs": 1.12,
+      "executionMs": 0.878,
       "targetMs": 5,
       "pass": true
     },
     {
       "query": "Accountability Sprint (batched)",
-      "executionMs": 0.193,
+      "executionMs": 1.484,
       "targetMs": 5,
       "pass": true
     }

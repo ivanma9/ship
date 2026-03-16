@@ -8,7 +8,7 @@
 
 ## [0:00–0:20] Hook — The Problem
 
-> "Ship is a real-time collaborative doc platform — wiki, issues, sprints, all in one place. We ran a full audit across 7 categories. What we found was a 2 MB entry bundle, API responses taking over 100ms at load, and 34 accessibility violations blocking screen readers. Here's what we fixed."
+> "Ship is a real-time collaborative doc platform — wiki, issues, sprints, all in one place. We ran a full audit across 7 categories. What we found was a 2 MB payload, API responses over 100ms at load, 24 console errors per session, and 34 accessibility violations blocking screen readers. Here's what we fixed."
 
 ---
 
@@ -60,7 +60,7 @@ BEFORE  Search: 2 queries  →  0.979 ms total
 AFTER   Search: 1 CTE      →  0.360 ms total   (−63%)
 ```
 
-> "Merged into a single CTE with a UNION ALL. One round-trip instead of two. We also landed four more DB optimizations: fixed an N+1 in programs (2N correlated subqueries → derived-table joins, −53% execution time), added covering composite indexes on `document_associations`, replaced an O(n) correlated subquery in the dashboard with a CTE, and consolidated two separate owner-lookup queries in document detail into one."
+> "Merged into a single CTE with a UNION ALL. One round-trip instead of two. We also landed five more DB optimizations: fixed an N+1 in programs (2N correlated subqueries → derived-table joins, −53% execution time), added covering composite indexes on `document_associations`, replaced an O(n) correlated subquery in the dashboard with a CTE, consolidated two separate owner-lookup queries in document detail into one, and reordered programs COUNT joins with soft-delete filters."
 
 ---
 
@@ -97,8 +97,8 @@ Dark-logic specs:    0 → 3     (reconnect, autosave, timeout — now tested)
 BEFORE  Lighthouse:  Dashboard 95 | My Week 95 | Issues 96
         Serious violations: 34  (all contrast failures)
 
-AFTER   Lighthouse:  Dashboard 100 | My Week 100 | Issues 100
-        Serious violations: 0   (app-wide sweep of 40+ components)
+AFTER   Lighthouse:  Dashboard 100 | My Week 100 | Issues 100   (priority pages)
+        Serious violations: 0   (all 9 pages, app-wide sweep of 40+ components)
 ```
 
 > "We swept 40+ components — focus rings, placeholders, text-accent tokens, mention chips. All WCAG AA compliant now. A Playwright + axe-core CI gate catches regressions on every PR."
@@ -107,7 +107,7 @@ AFTER   Lighthouse:  Dashboard 100 | My Week 100 | Issues 100
 
 ## [2:55–3:00] Close
 
-> "All seven categories fully measured before and after with confirmed improvements. Type safety down 27.5%, runtime console errors from 24 to 2. All changes are on master, CI green."
+> "All seven categories fully measured before and after with confirmed improvements. Type safety down 31.6%, runtime console errors from 24 to 2, Yjs collision divergence resolved. Auth stability fixes (SameSite, 401 retry) and image command production fix also landed. All changes are on master, CI green."
 
 ---
 
@@ -115,5 +115,6 @@ AFTER   Lighthouse:  Dashboard 100 | My Week 100 | Issues 100
 
 - **Pacing:** Each section has a hard time box — don't expand on details, hit the number and move on.
 - **Evidence order:** Show terminal/file first, then narrate the number. Don't narrate a number that isn't visible yet.
-- **If asked about type safety:** "We reduced core violations from 1,283 to 929 — a 27.5% reduction. A CI ceiling gate now blocks any PR that regresses above 929."
-- **If asked about runtime errors:** "Console errors went from 24 to 2 per session. Unhandled promise rejections and silent failures both at zero. The two remaining errors are benign pre-auth resource loads."
+- **If asked about type safety:** "We reduced core violations from 1,283 to 878 — a 31.6% reduction. A CI ceiling gate now blocks any PR that regresses above 878."
+- **If asked about runtime errors:** "Console errors went from 24 to 2 per session. Unhandled promise rejections and silent failures both at zero. Yjs collision divergence resolved — concurrent edits now converge. The two remaining errors are benign pre-auth resource loads."
+- **If asked about auth/production:** "Auth stability fixes: SameSite=None for cross-origin, 401 retry elimination, false session-expired prevention. Image command: auth removed from serve route, R2/S3 support, CDN_DOMAIN documented."
