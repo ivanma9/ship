@@ -442,7 +442,7 @@ test.describe('Bulk Selection - Keyboard Navigation', () => {
   });
 
   test.describe('Selection with Enter/Space', () => {
-    test('Enter toggles selection of focused row', async ({ page }) => {
+    test('Enter on focused row navigates to item detail', async ({ page }) => {
       await login(page);
       await page.goto('/issues');
       await expect(page.getByRole('heading', { name: 'Issues', level: 1 })).toBeVisible({ timeout: 10000 });
@@ -450,19 +450,15 @@ test.describe('Bulk Selection - Keyboard Navigation', () => {
       const rows = page.locator('tbody tr');
       await expect(rows.first()).toBeVisible();
 
-      // Hover to establish React focus state (without selecting)
+      // Hover to establish React focus state
       await rows.nth(0).hover();
       await expect(rows.nth(0)).toHaveClass(/ring-2/);
 
-      // Focus table and press Enter to select
+      // Focus table and press Enter to navigate (Enter = open, Space = toggle selection)
       const table = page.locator('table[role="grid"]');
       await table.focus();
       await page.keyboard.press('Enter');
-      await expect(rows.nth(0)).toHaveAttribute('data-selected', 'true');
-
-      // Press Enter again to deselect
-      await page.keyboard.press('Enter');
-      await expect(rows.nth(0)).not.toHaveAttribute('data-selected', 'true');
+      await expect(page).toHaveURL(/\/documents\/[a-f0-9-]+/, { timeout: 5000 });
     });
 
     test('Space toggles selection of focused row', async ({ page }) => {
@@ -838,12 +834,13 @@ test.describe('Global j/k Vim-Style Navigation', () => {
 
       // Move mouse outside the list to prevent hover-to-focus interference
       await page.mouse.move(0, 0);
-      await page.waitForTimeout(100);
 
-      // Focus the row with j
+      // Focus the grid and use ArrowDown to move to first row
+      const grid = page.locator('table[role="grid"]');
+      await grid.focus();
+      await page.keyboard.press('ArrowDown');
       const firstRow = rows.first();
-      await page.keyboard.press('j');
-      await expect(firstRow).toHaveClass(/ring-2/, { timeout: 3000 });
+      await expect(firstRow).toHaveAttribute('data-focused', 'true', { timeout: 5000 });
 
       // Press Enter to navigate to issue
       await page.keyboard.press('Enter');

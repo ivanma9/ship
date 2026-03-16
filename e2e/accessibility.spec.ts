@@ -340,6 +340,9 @@ test.describe('Accessibility - ARIA Grid Keyboard Traversal', () => {
     // aria-rowindex includes the header (rowindex=1) plus data rows (rowindex>=2)
     expect(dataRowCount, 'Seed data should provide at least 3 data rows (aria-rowindex 2, 3, 4+). Run: pnpm db:seed').toBeGreaterThanOrEqual(3)
 
+    // Move mouse outside the grid to prevent hover-to-focus interference
+    await page.mouse.move(0, 0)
+
     // Tab into the grid — focus the grid container
     await grid.focus()
     await expect(grid).toBeFocused()

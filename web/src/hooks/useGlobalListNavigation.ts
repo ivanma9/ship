@@ -55,6 +55,11 @@ export function useGlobalListNavigation({
       return;
     }
 
+    // Skip arrow keys when focus is inside a grid — the grid's own handler owns navigation
+    if (target.closest?.('[role="grid"]') && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      return;
+    }
+
     const isShiftKey = e.shiftKey;
 
     switch (e.key) {

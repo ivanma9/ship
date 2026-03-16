@@ -111,19 +111,8 @@ export function SelectableList<T extends { id: string }>({
     onContextMenu?.(e, item, selection);
   }, [getItemId, selection, onContextMenu]);
 
-  if (loading) {
-    return <SelectableListSkeleton columns={columns?.length || 5} />;
-  }
-
-  if (items.length === 0 && emptyState) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        {emptyState}
-      </div>
-    );
-  }
-
   // Total column count: optional checkbox column + data columns
+  // NOTE: Must be before early returns so handleGridKeyDown hook order is stable
   const totalColCount = (columns ? columns.length : 0) + (selectable ? 1 : 0);
 
   const handleGridKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -145,6 +134,18 @@ export function SelectableList<T extends { id: string }>({
     }
   }, [selectable, selection, totalColCount]);
 
+  if (loading) {
+    return <SelectableListSkeleton columns={columns?.length || 5} />;
+  }
+
+  if (items.length === 0 && emptyState) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        {emptyState}
+      </div>
+    );
+  }
+
   return (
     <>
       <table
@@ -157,8 +158,6 @@ export function SelectableList<T extends { id: string }>({
         tabIndex={0}
         onKeyDown={handleGridKeyDown}
         onMouseLeave={() => {
-          // Clear focusedId when mouse leaves the table entirely.
-          // This ensures pressing 'j' after mouse exits starts from the first row.
           setHoveredId(null);
           selection.setFocusedId(null);
         }}
@@ -217,9 +216,6 @@ export function SelectableList<T extends { id: string }>({
                 onFocus={() => selection.setFocusedId(itemId)}
                 onMouseEnter={() => {
                   setHoveredId(itemId);
-                  // Set focusedId on hover for Superhuman-style UX.
-                  // When mouse leaves the table entirely (see onMouseLeave on <table>),
-                  // focusedId is cleared so 'j' starts from the first row.
                   selection.setFocusedId(itemId);
                 }}
                 onMouseLeave={() => setHoveredId(null)}
